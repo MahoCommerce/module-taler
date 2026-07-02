@@ -1,26 +1,77 @@
-# Maho NAME
+# GNU Taler payment gateway integration for Maho Commerce
 
 ![Maho Commerce](https://img.shields.io/badge/Maho_Commerce-module-orange)
 ![License](https://img.shields.io/badge/license-OSL--3.0-blue)
 ![PHP](https://img.shields.io/badge/php-%3E%3D8.3-8892BF)
 ![PHPStan Level](https://img.shields.io/badge/PHPStan-level%208-brightgreen)
 
-**TODO: one-line pitch.** Longer description of what this module does, who it's for, and the integration it provides for [Maho Commerce](https://mahocommerce.com).
+Accept payments through [GNU Taler](https://www.taler.net), the free and open source, privacy-preserving payment system. Shoppers pay from a Taler wallet (browser extension or mobile app) using digital cash — the payer stays anonymous while every transaction remains taxable and auditable on the merchant side.
+
+> **Status: Early development.** This repository is being scaffolded; the payment integration is not yet feature-complete. The sections below describe the intended integration against the [GNU Taler merchant backend](https://docs.taler.net/) REST API. Track progress in the [Roadmap](#roadmap).
+
+## How GNU Taler works
+
+Unlike card gateways, Taler does not process cards or hold merchant funds. You run (or connect to) a **Taler merchant backend** that talks to an exchange. Maho creates an order in the backend, the customer's wallet claims and pays it, and Maho confirms the payment by polling the backend. Settlement to your bank account is handled by the exchange out of band.
 
 ## Requirements
 
 - PHP >= 8.3
-- Maho Commerce
+- Maho Commerce >= 26.5
+- Access to a [GNU Taler merchant backend](https://docs.taler.net/taler-merchant-manual.html) instance and the API access token for one of its instances
 
 ## Installation
 
 ```bash
-composer require mahocommerce/module-NAME
+composer require mahocommerce/module-taler
+```
+
+Clear the cache after installation:
+
+```bash
+./maho cache:flush
 ```
 
 ## Configuration
 
-TODO: how to enable and configure the module from the Maho admin (System → Configuration → ...).
+Navigate to **System > Configuration > Payment Methods > Taler** in the Maho admin panel.
+
+| Setting | Description | Default |
+|---|---|---|
+| **Enabled** | Activate the payment method | No |
+| **Title** | Payment method name shown at checkout | GNU Taler |
+| **Merchant Backend URL** | Base URL of your Taler merchant backend (e.g. `https://backend.demo.taler.net/`) | — |
+| **Instance** | Merchant backend instance ID to bill against | — |
+| **API Access Token** | Bearer token used to authenticate against the backend (`Authorization: Bearer secret-token:...`) | — |
+| **Applicable Countries** | All countries or specific countries only | All |
+| **Sort Order** | Display position among payment methods | 100 |
+
+### Sandbox / demo
+
+GNU Taler runs a public demo environment you can use for testing without real money:
+
+- Merchant backend: <https://backend.demo.taler.net/>
+- Demo bank (to fund a wallet with `KUDOS`): <https://bank.demo.taler.net/>
+- Install the [Taler wallet](https://wallet.taler.net/) browser extension or mobile app to pay
+
+Amounts are expressed in Taler's `CURRENCY:VALUE.FRACTION` format (e.g. `EUR:10.00`, `KUDOS:5.00`).
+
+## How It Works
+
+1. **Order placement** — Customer selects Taler at checkout; the module calls `POST /private/orders` on the merchant backend, which returns an `order_id` (plus a claim token).
+2. **Payment** — The module reads the order's `taler_pay_uri` from the order status and hands the customer to their Taler wallet (via that pay URI / QR code) to pay with digital cash.
+3. **Confirmation** — The module polls `GET /private/orders/{order_id}` until the order status is `paid`, then captures the payment and creates an invoice.
+4. **Refunds** — Full and partial refunds are issued from the Maho admin via `POST /private/orders/{order_id}/refund`.
+
+## Roadmap
+
+- [ ] Merchant backend order creation + pay URI / QR handoff
+- [ ] Payment status polling and invoice capture
+- [ ] Cron safety net for orders left pending
+- [ ] Online refunds (full + partial) from admin
+- [ ] Configurable pending / processing order statuses
+- [ ] Multi-store backend/instance scoping
+- [ ] Debug logging toggle (`var/log/taler.log`)
+- [ ] Translations
 
 ## Development
 
@@ -33,18 +84,13 @@ This module ships with the standard Maho CI gates:
 
 Run `composer install` and you can execute any of the above locally before pushing.
 
----
+## License
 
-## Using this template
+This module is licensed under the [Open Software License v3.0](LICENSE.txt).
 
-When you create a new repo from this template:
+## Links
 
-1. **Rename placeholders** — find/replace `NAME` and `module-NAME` across the repo:
-   - `composer.json` → `name` and `description`
-   - `README.md` → title, pitch, install command
-2. **Update the badge URLs** if you want CI status badges (they're not included by default — the 4 static badges above are the org standard).
-3. **Bootstrap the module code** under `app/code/community/Vendor/Module/` (or `app/code/core/Maho/Module/` for first-party Maho modules) and declare it in `app/etc/modules/Vendor_Module.xml`.
-4. **Add `.github/FUNDING.yml`** (already included — leave as-is for org-owned repos, edit/remove for forks).
-5. **Update this section** of the README with the real module docs once you've shipped something.
-
-See an existing module for reference: [module-mollie](https://github.com/MahoCommerce/module-mollie), [module-przelewy24](https://github.com/MahoCommerce/module-przelewy24).
+- [Maho Commerce](https://mahocommerce.com)
+- [GNU Taler](https://www.taler.net)
+- [GNU Taler documentation](https://docs.taler.net/)
+- [GNU Taler merchant backend API](https://docs.taler.net/core/api-merchant.html)
