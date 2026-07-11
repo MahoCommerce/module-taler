@@ -94,6 +94,8 @@ Run `composer install` and you can execute any of the above locally before pushi
 
 The integration suite boots a real Maho application and exercises the API client against a live Taler merchant backend (order create/read/delete, refund and auth error mapping). On CI it runs against the public demo backend by default; set the `TALER_BACKEND_URL`, `TALER_INSTANCE` and `TALER_API_TOKEN` repository secrets to test against your own backend instead (use `@root` as the instance for the default instance at the backend root).
 
+When `taler-wallet-cli` is available (on Linux: Taler's `noble-testing` apt channel, matching the demo deployment), the suite also runs **real payments**: a headless wallet withdraws KUDOS from the demo bank, pays the order, and the tests verify the paid status, cumulative partial refunds and the wallet collecting the refund. These paid-path tests skip automatically when the wallet CLI is missing or the backend currency is not KUDOS.
+
 To run it locally, install Maho into this repo once (SQLite, no services needed) and opt in via the environment:
 
 ```bash

@@ -76,11 +76,24 @@ jobs:
                   --admin_email test@example.com
                   --admin_username admin --admin_password 'AdminTest123456!'
 
+            # The wallet pays real (play-money) orders in the paid-path tests.
+            # It must come from Taler's *-testing apt channel: the demo
+            # deployment tracks master, and the stable wallet's protocol
+            # version is too old for the demo exchange.
+            - name: Install taler-wallet-cli
+              run: |
+                  sudo wget -qO /etc/apt/trusted.gpg.d/taler.gpg https://taler.net/taler-systems.gpg
+                  echo "deb https://deb.taler.net/apt/ubuntu noble-testing main" | sudo tee /etc/apt/sources.list.d/taler.list
+                  sudo apt-get update -qq
+                  sudo apt-get install -y -qq taler-wallet-cli
+                  taler-wallet-cli --version
+
             # Runs against the public Taler demo backend by default (no secret
             # needed). Set the TALER_BACKEND_URL / TALER_INSTANCE /
             # TALER_API_TOKEN repository secrets to test against your own
             # merchant backend instead (TALER_INSTANCE "@root" = default
-            # instance at the backend root).
+            # instance at the backend root); the paid-path tests skip
+            # automatically when the backend currency is not KUDOS.
             - name: Run integration tests
               env:
                   TALER_INTEGRATION: '1'
