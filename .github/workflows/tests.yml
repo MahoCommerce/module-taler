@@ -1,0 +1,103 @@
+name: Tests
+
+on:
+    push:
+        branches: [main]
+    pull_request:
+    workflow_dispatch:
+
+jobs:
+    pest:
+        runs-on: ubuntu-latest
+
+        strategy:
+            matrix:
+                php-version: ['8.3', '8.4', '8.5']
+
+        name: Pest (PHP ${{ matrix.php-version }})
+
+        steps:
+            - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+            - uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # 2.37.2
+              with:
+                  php-version: ${{ matrix.php-version }}
+
+            - name: Get Composer cache directory
+              id: composer-cache
+              run: echo "dir=$(composer config cache-files-dir)" >> $GITHUB_OUTPUT
+
+            - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+              with:
+                  path: ${{ steps.composer-cache.outputs.dir }}
+                  key: composer-${{ matrix.php-version }}-${{ hashFiles('composer.lock') }}
+                  restore-keys: composer-${{ matrix.php-version }}-
+
+            - name: Install dependencies
+              run: composer install --no-interaction --no-progress
+
+            - name: Run Pest
+              run: XDEBUG_MODE=off php vendor/bin/pest --testsuite Unit
+
+    integration:
+        runs-on: ubuntu-latest
+
+        name: Integration (Taler backend)
+
+        steps:
+            - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+            - uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # 2.37.2
+              with:
+                  php-version: '8.3'
+
+            - name: Get Composer cache directory
+              id: composer-cache
+              run: echo "dir=$(composer config cache-files-dir)" >> $GITHUB_OUTPUT
+
+            - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+              with:
+                  path: ${{ steps.composer-cache.outputs.dir }}
+                  key: composer-8.3-${{ hashFiles('composer.lock') }}
+                  restore-keys: composer-8.3-
+
+            - name: Install dependencies
+              run: composer install --no-interaction --no-progress
+
+            - name: Install Maho (SQLite)
+              run: >
+                  php maho install
+                  --license_agreement_accepted yes
+                  --locale en_US --timezone Europe/Rome --default_currency EUR
+                  --db_engine sqlite --db_name taler_test.sqlite
+                  --db_host localhost --db_user '' --db_pass ''
+                  --url 'http://taler.test/'
+                  --admin_lastname Test --admin_firstname Test
+                  --admin_email test@example.com
+                  --admin_username admin --admin_password 'AdminTest123456!'
+
+            # The wallet pays real (play-money) orders in the paid-path tests.
+            # It must come from Taler's *-testing apt channel: the demo
+            # deployment tracks master, and the stable wallet's protocol
+            # version is too old for the demo exchange.
+            - name: Install taler-wallet-cli
+              run: |
+                  sudo wget -qO /etc/apt/trusted.gpg.d/taler.gpg https://taler.net/taler-systems.gpg
+                  echo "deb https://deb.taler.net/apt/ubuntu noble-testing main" | sudo tee /etc/apt/sources.list.d/taler.list
+                  sudo apt-get update -qq
+                  sudo apt-get install -y -qq taler-wallet-cli
+                  taler-wallet-cli --version
+
+            # Runs against the public Taler demo backend by default (no secret
+            # needed). Set the TALER_BACKEND_URL / TALER_INSTANCE /
+            # TALER_API_TOKEN repository secrets to test against your own
+            # merchant backend instead (TALER_INSTANCE "@root" = default
+            # instance at the backend root); the paid-path tests skip
+            # automatically when the backend currency is not KUDOS.
+            - name: Run integration tests
+              env:
+                  TALER_INTEGRATION: '1'
+                  TALER_BACKEND_URL: ${{ secrets.TALER_BACKEND_URL || 'https://backend.demo.taler.net' }}
+                  TALER_INSTANCE: ${{ secrets.TALER_INSTANCE || 'sandbox' }}
+                  TALER_API_TOKEN: ${{ secrets.TALER_API_TOKEN || 'sandbox' }}
+              run: XDEBUG_MODE=off php vendor/bin/pest --testsuite Integration

@@ -1,0 +1,158 @@
+<?xml version="1.0"?>
+<!--
+SPDX-FileCopyrightText: 2026 Maho <https://mahocommerce.com>
+SPDX-License-Identifier: OSL-3.0
+-->
+<config>
+    <sections>
+        <payment>
+            <groups>
+                <maho_taler_connection translate="label">
+                    <label>GNU Taler - Connection</label>
+                    <sort_order>310</sort_order>
+                    <show_in_default>1</show_in_default>
+                    <show_in_website>1</show_in_website>
+                    <show_in_store>0</show_in_store>
+                    <expanded>1</expanded>
+                    <fields>
+                        <backend_url translate="label comment">
+                            <label>Merchant Backend URL</label>
+                            <frontend_type>text</frontend_type>
+                            <config_path>maho_taler/connection/backend_url</config_path>
+                            <sort_order>10</sort_order>
+                            <show_in_default>1</show_in_default>
+                            <show_in_website>1</show_in_website>
+                            <show_in_store>0</show_in_store>
+                            <comment>Base URL of your Taler merchant backend, e.g. https://backend.demo.taler.net</comment>
+                        </backend_url>
+                        <instance translate="label comment">
+                            <label>Instance</label>
+                            <frontend_type>text</frontend_type>
+                            <config_path>maho_taler/connection/instance</config_path>
+                            <sort_order>20</sort_order>
+                            <show_in_default>1</show_in_default>
+                            <show_in_website>1</show_in_website>
+                            <show_in_store>0</show_in_store>
+                            <comment>Merchant backend instance ID to bill against. Leave empty for the default instance at the backend root.</comment>
+                        </instance>
+                        <api_token translate="label comment">
+                            <label>API Access Token</label>
+                            <frontend_type>obscure</frontend_type>
+                            <backend_model>adminhtml/system_config_backend_encrypted</backend_model>
+                            <config_path>maho_taler/connection/api_token</config_path>
+                            <sort_order>30</sort_order>
+                            <show_in_default>1</show_in_default>
+                            <show_in_website>1</show_in_website>
+                            <show_in_store>0</show_in_store>
+                            <comment>Access token for the instance's /private API, with or without the "secret-token:" prefix.</comment>
+                        </api_token>
+                        <refund_delay_days translate="label comment">
+                            <label>Refund Window (days)</label>
+                            <frontend_type>text</frontend_type>
+                            <config_path>maho_taler/connection/refund_delay_days</config_path>
+                            <sort_order>40</sort_order>
+                            <show_in_default>1</show_in_default>
+                            <show_in_website>1</show_in_website>
+                            <show_in_store>0</show_in_store>
+                            <comment>Refund window granted at order creation. After it passes, the Taler backend rejects refunds for the order.</comment>
+                        </refund_delay_days>
+                        <debug translate="label comment">
+                            <label>Debug Logging</label>
+                            <frontend_type>select</frontend_type>
+                            <source_model>adminhtml/system_config_source_yesno</source_model>
+                            <config_path>maho_taler/connection/debug</config_path>
+                            <sort_order>50</sort_order>
+                            <show_in_default>1</show_in_default>
+                            <show_in_website>1</show_in_website>
+                            <show_in_store>0</show_in_store>
+                            <comment>Log API requests and responses to var/log/taler.log.</comment>
+                        </debug>
+                    </fields>
+                </maho_taler_connection>
+
+                <taler translate="label">
+                    <label>GNU Taler - Payment Method</label>
+                    <sort_order>311</sort_order>
+                    <show_in_default>1</show_in_default>
+                    <show_in_website>1</show_in_website>
+                    <show_in_store>1</show_in_store>
+                    <fields>
+                        <active translate="label">
+                            <label>Enabled</label>
+                            <frontend_type>select</frontend_type>
+                            <source_model>adminhtml/system_config_source_yesno</source_model>
+                            <config_path>payment/taler/active</config_path>
+                            <sort_order>10</sort_order>
+                            <show_in_default>1</show_in_default>
+                            <show_in_website>1</show_in_website>
+                            <show_in_store>0</show_in_store>
+                        </active>
+                        <title translate="label">
+                            <label>Title</label>
+                            <frontend_type>text</frontend_type>
+                            <config_path>payment/taler/title</config_path>
+                            <sort_order>20</sort_order>
+                            <show_in_default>1</show_in_default>
+                            <show_in_website>1</show_in_website>
+                            <show_in_store>1</show_in_store>
+                        </title>
+                        <allowspecific translate="label">
+                            <label>Payment from Applicable Countries</label>
+                            <frontend_type>allowspecific</frontend_type>
+                            <source_model>adminhtml/system_config_source_payment_allspecificcountries</source_model>
+                            <config_path>payment/taler/allowspecific</config_path>
+                            <sort_order>30</sort_order>
+                            <show_in_default>1</show_in_default>
+                            <show_in_website>1</show_in_website>
+                            <show_in_store>0</show_in_store>
+                        </allowspecific>
+                        <specificcountry translate="label">
+                            <label>Payment from Specific Countries</label>
+                            <frontend_type>multiselect</frontend_type>
+                            <source_model>adminhtml/system_config_source_country</source_model>
+                            <config_path>payment/taler/specificcountry</config_path>
+                            <sort_order>40</sort_order>
+                            <show_in_default>1</show_in_default>
+                            <show_in_website>1</show_in_website>
+                            <show_in_store>0</show_in_store>
+                            <depends>
+                                <allowspecific>1</allowspecific>
+                            </depends>
+                        </specificcountry>
+                        <sort_order translate="label">
+                            <label>Sort Order</label>
+                            <frontend_type>text</frontend_type>
+                            <config_path>payment/taler/sort_order</config_path>
+                            <sort_order>50</sort_order>
+                            <show_in_default>1</show_in_default>
+                            <show_in_website>1</show_in_website>
+                            <show_in_store>0</show_in_store>
+                        </sort_order>
+                        <order_status_pending translate="label comment">
+                            <label>Pending-payment order status</label>
+                            <frontend_type>select</frontend_type>
+                            <source_model>maho_taler/system_config_source_order_status_pending</source_model>
+                            <config_path>payment/taler/order_status_pending</config_path>
+                            <sort_order>60</sort_order>
+                            <show_in_default>1</show_in_default>
+                            <show_in_website>1</show_in_website>
+                            <show_in_store>1</show_in_store>
+                            <comment>Applied while the customer is paying from their Taler wallet, before the payment is confirmed.</comment>
+                        </order_status_pending>
+                        <order_status_processing translate="label comment">
+                            <label>Paid (processing) order status</label>
+                            <frontend_type>select</frontend_type>
+                            <source_model>adminhtml/system_config_source_order_status_processing</source_model>
+                            <config_path>payment/taler/order_status_processing</config_path>
+                            <sort_order>70</sort_order>
+                            <show_in_default>1</show_in_default>
+                            <show_in_website>1</show_in_website>
+                            <show_in_store>1</show_in_store>
+                            <comment>Applied after the Taler backend confirms the payment. State remains "processing".</comment>
+                        </order_status_processing>
+                    </fields>
+                </taler>
+            </groups>
+        </payment>
+    </sections>
+</config>

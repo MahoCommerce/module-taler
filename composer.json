@@ -13,11 +13,13 @@
         "phpstan/phpstan": "*",
         "phpstan/phpstan-deprecation-rules": "*",
         "phpstan/phpstan-strict-rules": "*",
-        "rector/rector": "*"
+        "rector/rector": "*",
+        "pestphp/pest": "^4"
     },
     "config": {
         "allow-plugins": {
-            "mahocommerce/maho-composer-plugin": true
+            "mahocommerce/maho-composer-plugin": true,
+            "pestphp/pest-plugin": true
         },
         "platform": {
             "php": "8.3"
