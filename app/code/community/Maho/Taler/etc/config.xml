@@ -1,0 +1,78 @@
+<?xml version="1.0"?>
+<!--
+SPDX-FileCopyrightText: 2026 Maho <https://mahocommerce.com>
+SPDX-License-Identifier: OSL-3.0
+-->
+<config>
+    <modules>
+        <Maho_Taler>
+            <version>1.0.0</version>
+        </Maho_Taler>
+    </modules>
+
+    <global>
+        <models>
+            <maho_taler>
+                <class>Maho_Taler_Model</class>
+            </maho_taler>
+        </models>
+
+        <blocks>
+            <maho_taler>
+                <class>Maho_Taler_Block</class>
+            </maho_taler>
+        </blocks>
+
+        <helpers>
+            <maho_taler>
+                <class>Maho_Taler_Helper</class>
+            </maho_taler>
+        </helpers>
+
+        <payment>
+            <groups>
+                <maho_taler>GNU Taler</maho_taler>
+            </groups>
+        </payment>
+    </global>
+
+    <frontend>
+        <secure_url>
+            <maho_taler_payment>/taler/payment</maho_taler_payment>
+        </secure_url>
+        <translate>
+            <modules>
+                <Maho_Taler>
+                    <files>
+                        <default>Maho_Taler.csv</default>
+                    </files>
+                </Maho_Taler>
+            </modules>
+        </translate>
+    </frontend>
+
+    <default>
+        <maho_taler>
+            <connection>
+                <backend_url/>
+                <instance/>
+                <api_token backend_model="adminhtml/system_config_backend_encrypted"/>
+                <refund_delay_days>14</refund_delay_days>
+                <debug>0</debug>
+            </connection>
+        </maho_taler>
+        <payment>
+            <taler>
+                <active>0</active>
+                <model>maho_taler/method_standard</model>
+                <title>GNU Taler</title>
+                <group>maho_taler</group>
+                <allowspecific>0</allowspecific>
+                <sort_order>100</sort_order>
+                <payment_action>order</payment_action>
+                <order_status_pending>pending_payment</order_status_pending>
+                <order_status_processing>processing</order_status_processing>
+            </taler>
+        </payment>
+    </default>
+</config>

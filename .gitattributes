@@ -5,6 +5,8 @@
 /.php-cs-fixer.php    export-ignore
 /.phpstan.dist.neon   export-ignore
 /.rector.php          export-ignore
+/phpunit.xml          export-ignore
+/tests                export-ignore
 
 # Enforce LF line endings on checkout so the line-endings CI gate never fails
 *.css   text eol=lf
