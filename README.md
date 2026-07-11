@@ -76,7 +76,7 @@ Amounts are expressed in Taler's `CURRENCY:VALUE.FRACTION` format (e.g. `EUR:10.
 - [x] Configurable pending / processing order statuses
 - [x] Multi-store backend/instance scoping
 - [x] Debug logging toggle (`var/log/taler.log`)
-- [ ] Translations
+- [x] Translations (en, it, da, nl, fi, fr, de, el, pl, pt, pt_BR, ro, es, sv)
 
 ## Development
 
