@@ -82,13 +82,35 @@ Amounts are expressed in Taler's `CURRENCY:VALUE.FRACTION` format (e.g. `EUR:10.
 
 This module ships with the standard Maho CI gates:
 
-- **Pest** (unit tests) — `vendor/bin/pest`
+- **Pest** (unit tests) — `vendor/bin/pest --testsuite Unit`
 - **PHPStan** (level 8) — `vendor/bin/phpstan analyze`
 - **Rector** (dry-run) — `vendor/bin/rector -c .rector.php --dry-run`
 - **PHP CS Fixer** (dry-run) — `vendor/bin/php-cs-fixer fix --dry-run`
 - **PHP / XML syntax checks** — automatic on CI
 
 Run `composer install` and you can execute any of the above locally before pushing.
+
+### Integration tests
+
+The integration suite boots a real Maho application and exercises the API client against a live Taler merchant backend (order create/read/delete, refund and auth error mapping). On CI it runs against the public demo backend by default; set the `TALER_BACKEND_URL`, `TALER_INSTANCE` and `TALER_API_TOKEN` repository secrets to test against your own backend instead (use `@root` as the instance for the default instance at the backend root).
+
+To run it locally, install Maho into this repo once (SQLite, no services needed) and opt in via the environment:
+
+```bash
+composer install
+php maho install --license_agreement_accepted yes \
+  --locale en_US --timezone Europe/Rome --default_currency EUR \
+  --db_engine sqlite --db_name taler_test.sqlite \
+  --db_host localhost --db_user '' --db_pass '' \
+  --url 'http://taler.test/' \
+  --admin_lastname Test --admin_firstname Test \
+  --admin_email test@example.com \
+  --admin_username admin --admin_password 'AdminTest123456!'
+
+TALER_INTEGRATION=1 vendor/bin/pest --testsuite Integration
+```
+
+The wallet side cannot run headlessly, so the paid/refund happy path remains a manual test (see [Sandbox / demo](#sandbox--demo)).
 
 ## License
 

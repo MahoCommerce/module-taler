@@ -37,4 +37,54 @@ jobs:
               run: composer install --no-interaction --no-progress
 
             - name: Run Pest
-              run: XDEBUG_MODE=off php vendor/bin/pest
+              run: XDEBUG_MODE=off php vendor/bin/pest --testsuite Unit
+
+    integration:
+        runs-on: ubuntu-latest
+
+        name: Integration (Taler backend)
+
+        steps:
+            - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+            - uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # 2.37.2
+              with:
+                  php-version: '8.3'
+
+            - name: Get Composer cache directory
+              id: composer-cache
+              run: echo "dir=$(composer config cache-files-dir)" >> $GITHUB_OUTPUT
+
+            - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+              with:
+                  path: ${{ steps.composer-cache.outputs.dir }}
+                  key: composer-8.3-${{ hashFiles('composer.lock') }}
+                  restore-keys: composer-8.3-
+
+            - name: Install dependencies
+              run: composer install --no-interaction --no-progress
+
+            - name: Install Maho (SQLite)
+              run: >
+                  php maho install
+                  --license_agreement_accepted yes
+                  --locale en_US --timezone Europe/Rome --default_currency EUR
+                  --db_engine sqlite --db_name taler_test.sqlite
+                  --db_host localhost --db_user '' --db_pass ''
+                  --url 'http://taler.test/'
+                  --admin_lastname Test --admin_firstname Test
+                  --admin_email test@example.com
+                  --admin_username admin --admin_password 'AdminTest123456!'
+
+            # Runs against the public Taler demo backend by default (no secret
+            # needed). Set the TALER_BACKEND_URL / TALER_INSTANCE /
+            # TALER_API_TOKEN repository secrets to test against your own
+            # merchant backend instead (TALER_INSTANCE "@root" = default
+            # instance at the backend root).
+            - name: Run integration tests
+              env:
+                  TALER_INTEGRATION: '1'
+                  TALER_BACKEND_URL: ${{ secrets.TALER_BACKEND_URL || 'https://backend.demo.taler.net' }}
+                  TALER_INSTANCE: ${{ secrets.TALER_INSTANCE || 'sandbox' }}
+                  TALER_API_TOKEN: ${{ secrets.TALER_API_TOKEN || 'sandbox' }}
+              run: XDEBUG_MODE=off php vendor/bin/pest --testsuite Integration

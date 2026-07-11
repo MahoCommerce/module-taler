@@ -1,6 +1,8 @@
 /vendor/
 /maho
 /public/
+/var/
+/app/etc/local.xml
 composer.lock
 .phpstan.cache/
 .php-cs-fixer.cache

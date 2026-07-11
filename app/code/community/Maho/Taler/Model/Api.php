@@ -131,6 +131,19 @@ class Maho_Taler_Model_Api
     }
 
     /**
+     * Delete an order from the backend. Only unpaid (or fully wire-settled)
+     * orders can be deleted; the backend refuses for orders awaiting
+     * settlement.
+     *
+     * @throws Maho_Taler_Model_Api_NotFoundException when the backend no longer knows the order
+     * @throws Mage_Core_Exception
+     */
+    public function deleteOrder(string $orderId): void
+    {
+        $this->_request('DELETE', '/private/orders/' . rawurlencode($orderId));
+    }
+
+    /**
      * Perform an HTTP request against the merchant backend.
      *
      * @param array<int, string> $errorMessages Per-HTTP-status user-facing
