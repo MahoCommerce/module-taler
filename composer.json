@@ -16,6 +16,11 @@
         "rector/rector": "*",
         "pestphp/pest": "^4"
     },
+    "extra": {
+        "maho": {
+            "publish-assets": true
+        }
+    },
     "config": {
         "allow-plugins": {
             "mahocommerce/maho-composer-plugin": true,
