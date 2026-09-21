@@ -10,20 +10,33 @@ declare(strict_types=1);
 
 class Maho_Taler_Model_Method_Standard extends Mage_Payment_Model_Method_Abstract
 {
+    #[\Override]
     protected $_code = 'taler';
 
+    #[\Override]
     protected $_formBlockType = 'maho_taler/form';
+    #[\Override]
     protected $_infoBlockType = 'maho_taler/info';
 
+    #[\Override]
     protected $_isGateway = true;
+    #[\Override]
     protected $_canAuthorize = false;
+    #[\Override]
     protected $_canCapture = true;
+    #[\Override]
     protected $_canRefund = true;
+    #[\Override]
     protected $_canRefundInvoicePartial = true;
+    #[\Override]
     protected $_canVoid = false;
+    #[\Override]
     protected $_canUseInternal = false;
+    #[\Override]
     protected $_canUseCheckout = true;
+    #[\Override]
     protected $_isInitializeNeeded = true;
+    #[\Override]
     protected $_canFetchTransactionInfo = true;
 
     protected ?Maho_Taler_Model_Api $_api = null;

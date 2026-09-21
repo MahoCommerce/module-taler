@@ -12,6 +12,7 @@ class Maho_Taler_Helper_Data extends Mage_Core_Helper_Abstract
 {
     public const LOG_FILE = 'taler.log';
 
+    #[\Override]
     protected $_moduleName = 'Maho_Taler';
 
     public function getBackendUrl(?int $storeId = null): string
