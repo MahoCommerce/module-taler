@@ -21,9 +21,9 @@ declare(strict_types=1);
  *   TALER_INSTANCE     instance id        (default "sandbox"; "@root" = default instance)
  *   TALER_API_TOKEN    /private API token (default "sandbox")
  *
- * The wallet-side payment cannot run headlessly, so integration covers the
- * merchant-side API surface; the paid/refund happy path stays with the
- * manual end-to-end procedure in the README.
+ * The paid-path tests also need taler-wallet-cli (see PaymentIntegrationTest).
+ * The storefront and admin flows are covered by the Playwright suite in
+ * tests/Browser.
  */
 
 uses()

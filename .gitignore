@@ -9,3 +9,6 @@ composer.lock
 .phpunit.cache/
 .idea/
 .vscode/
+/tests/Browser/node_modules/
+/tests/Browser/playwright-report/
+/tests/Browser/test-results/

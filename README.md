@@ -2,12 +2,10 @@
 
 ![Maho Commerce](https://img.shields.io/badge/Maho_Commerce-module-orange)
 ![License](https://img.shields.io/badge/license-OSL--3.0-blue)
-![PHP](https://img.shields.io/badge/php-%3E%3D8.3-8892BF)
+![PHP](https://img.shields.io/badge/php-%3E%3D8.5-8892BF)
 ![PHPStan Level](https://img.shields.io/badge/PHPStan-level%208-brightgreen)
 
 Accept payments through [GNU Taler](https://www.taler.net), the free and open source, privacy-preserving payment system. Shoppers pay from a Taler wallet (browser extension or mobile app) using digital cash — the payer stays anonymous while every transaction remains taxable and auditable on the merchant side.
-
-> **Status: Early development.** The core payment integration against the [GNU Taler merchant backend](https://docs.taler.net/) REST API is implemented (see the [Roadmap](#roadmap)) but has not yet seen wide production use — test against the demo backend before going live.
 
 ## How GNU Taler works
 
@@ -15,7 +13,7 @@ Unlike card gateways, Taler does not process cards or hold merchant funds. You r
 
 ## Requirements
 
-- PHP >= 8.3
+- PHP >= 8.5
 - Maho Commerce >= 26.5
 - Access to a [GNU Taler merchant backend](https://docs.taler.net/taler-merchant-manual.html) instance and the API access token for one of its instances
 
@@ -67,24 +65,13 @@ Amounts are expressed in Taler's `CURRENCY:VALUE.FRACTION` format (e.g. `EUR:10.
 3. **Confirmation** — The module verifies `GET /private/orders/{order_id}` server-side on return; a 5-minute cron safety net captures orders whose customers never returned and cancels expired ones. Confirmed payments are captured and invoiced.
 4. **Refunds** — Full and partial refunds are issued from the Maho admin (online creditmemos) via `POST /private/orders/{order_id}/refund`.
 
-## Roadmap
-
-- [x] Merchant backend order creation + pay URI / QR handoff
-- [x] Payment status polling and invoice capture
-- [x] Cron safety net for orders left pending
-- [x] Online refunds (full + partial) from admin
-- [x] Configurable pending / processing order statuses
-- [x] Multi-store backend/instance scoping
-- [x] Debug logging toggle (`var/log/taler.log`)
-- [x] Translations (en, it, da, nl, fi, fr, de, el, pl, pt, pt_BR, ro, es, sv)
-
 ## Development
 
 This module ships with the standard Maho CI gates:
 
 - **Pest** (unit tests) — `vendor/bin/pest --testsuite Unit`
 - **PHPStan** (level 8) — `vendor/bin/phpstan analyze`
-- **Rector** (dry-run) — `vendor/bin/rector -c .rector.php --dry-run`
+- **Rector** (dry-run) — `vendor/bin/rector --dry-run`
 - **PHP CS Fixer** (dry-run) — `vendor/bin/php-cs-fixer fix --dry-run`
 - **PHP / XML syntax checks** — automatic on CI
 
@@ -112,7 +99,32 @@ php maho install --license_agreement_accepted yes \
 TALER_INTEGRATION=1 vendor/bin/pest --testsuite Integration
 ```
 
-The wallet side cannot run headlessly, so the paid/refund happy path remains a manual test (see [Sandbox / demo](#sandbox--demo)).
+These tests call the API client directly. The [browser tests](#browser-tests) cover the storefront and admin side.
+
+### Browser tests
+
+A [Playwright](https://playwright.dev) suite in `tests/Browser` runs the whole flow in Chromium against the demo backend:
+
+1. A guest buys a product and picks GNU Taler at checkout.
+2. The browser lands on the backend payment page. `taler-wallet-cli` pays the `taler://pay` URI shown there, as a phone wallet scanning the QR code would.
+3. The backend page sends the browser back to the store. The test checks the success page, the invoice and the order state.
+4. An admin opens the invoice and creates an online credit memo. The test checks the refund in the backend.
+
+The Node tooling stays in `tests/Browser`, and `.gitattributes` strips `tests/` from Composer downloads, so the module itself has no Node dependency.
+
+To run it locally, install Maho as for the integration tests (the base URL is replaced by the setup script), then:
+
+```bash
+php tests/Browser/setup.php
+cd tests/Browser
+npm ci
+npx playwright install chromium
+npx playwright test
+```
+
+`setup.php` switches the store currency to the backend currency (KUDOS) and creates a test product, so use a disposable installation. The test starts `php maho serve` on port 8000 unless a server already runs there. Set `TALER_WALLET_CLI` when the wallet binary is not on the `PATH` (for example a Docker wrapper on macOS).
+
+The browser tests do not cover the Taler browser extension or mobile wallets. Test a payment by hand with a real wallet before going live (see [Sandbox / demo](#sandbox--demo)).
 
 ## License
 

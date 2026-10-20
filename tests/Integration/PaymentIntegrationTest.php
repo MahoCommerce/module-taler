@@ -55,7 +55,7 @@ function talerWalletEnsureFunds(string $amount): void
     if ($funded) {
         return;
     }
-    $args = ['testing', 'withdraw-kudos', '--amount=' . $amount];
+    $args = ['testing', 'withdraw-kudos', '--amount=' . $amount, '--wait', '--timeout=2m'];
     $bankUrl = getenv('TALER_WALLET_BANK_URL');
     if ($bankUrl !== false && $bankUrl !== '') {
         $args[] = '--bank-url=' . $bankUrl;
@@ -65,7 +65,6 @@ function talerWalletEnsureFunds(string $amount): void
         $args[] = '--exchange-url=' . $exchangeUrl;
     }
     talerWallet(...$args);
-    talerWallet('run-until-done');
     $funded = true;
 }
 
@@ -90,9 +89,9 @@ test('a real wallet pays an order, and refunds accumulate until the wallet colle
     $unpaid = talerApi()->getOrder($orderId);
     expect($unpaid['order_status'])->toBe('unpaid');
 
-    // The wallet pays the same taler_pay_uri a customer would scan.
+    // The wallet pays the same taler_pay_uri a customer would scan. handle-uri
+    // waits for the payment to finish.
     talerWallet('handle-uri', '-y', (string) $unpaid['taler_pay_uri']);
-    talerWallet('run-until-done');
 
     // This is the exact response processPaymentStatus()/capturePaidOrder()
     // act on: paid, amount echoed in the contract terms, nothing refunded.
@@ -127,7 +126,6 @@ test('a real wallet pays an order, and refunds accumulate until the wallet colle
 
     // The customer's wallet collects the refund, which clears refund_pending.
     talerWallet('handle-uri', '-y', (string) $refund['taler_refund_uri']);
-    talerWallet('run-until-done');
     $afterPickup = [];
     foreach (range(1, 10) as $i) {
         $afterPickup = talerApi()->getOrder($orderId, 5000);

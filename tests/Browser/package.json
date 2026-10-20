@@ -1,0 +1,13 @@
+{
+    "name": "module-taler-browser-tests",
+    "private": true,
+    "description": "Playwright checkout test for the GNU Taler module. Lives under tests/, which .gitattributes strips from Composer downloads.",
+    "license": "OSL-3.0",
+    "type": "module",
+    "scripts": {
+        "test": "playwright test"
+    },
+    "devDependencies": {
+        "@playwright/test": "1.63.0"
+    }
+}
