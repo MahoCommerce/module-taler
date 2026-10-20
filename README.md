@@ -67,21 +67,21 @@ Amounts are expressed in Taler's `CURRENCY:VALUE.FRACTION` format (e.g. `EUR:10.
 
 ## Screenshots
 
-<p align="center">
-  <img src=".github/screenshots/checkout.png" alt="GNU Taler selected as the payment method at checkout" width="400"><br>
-  <sub><b>1. Checkout.</b> The customer selects GNU Taler.</sub>
-</p>
-
-<p align="center">
-  <img src=".github/screenshots/payment-page.png" alt="The GNU Taler payment page with a QR code" width="800"><br>
-  <sub><b>2. Payment.</b> The backend payment page: scan the QR code with a phone wallet, or open the browser wallet.</sub>
-</p>
-
-<table align="center">
+<table>
+  <tr>
+    <td width="50%" valign="top" align="center">
+      <img src=".github/screenshots/checkout.png" alt="GNU Taler selected as the payment method at checkout"><br>
+      <sub><b>1. Checkout.</b> The customer selects GNU Taler.</sub>
+    </td>
+    <td width="50%" valign="top" align="center">
+      <img src=".github/screenshots/payment-page.png" alt="The GNU Taler payment page with a QR code"><br>
+      <sub><b>2. Payment.</b> Scan the QR code with a phone wallet, or open the browser wallet.</sub>
+    </td>
+  </tr>
   <tr>
     <td width="50%" valign="top" align="center">
       <img src=".github/screenshots/admin-credit-memo.png" alt="The refund totals of a new credit memo, with the online Refund button" width="300"><br>
-      <sub><b>3. Refund.</b> Open the invoice, click <b>Credit Memo</b>, then <b>Refund</b>. The <b>Credit Memo</b> button of the order makes offline refunds only.</sub>
+      <sub><b>3. Refund.</b> Open the invoice, click <b>Credit Memo</b>, then <b>Refund</b>. The order's <b>Credit Memo</b> button makes offline refunds only.</sub>
     </td>
     <td width="50%" valign="top" align="center">
       <img src=".github/screenshots/admin-refund-history.png" alt="Order comments with the capture and two online refunds"><br>
@@ -90,7 +90,7 @@ Amounts are expressed in Taler's `CURRENCY:VALUE.FRACTION` format (e.g. `EUR:10.
   </tr>
 </table>
 
-<p align="center"><sub>The <a href="#browser-tests">browser tests</a> take these screenshots against the public demo backend.</sub></p>
+<sub>The <a href="#browser-tests">browser tests</a> take these screenshots against the public demo backend.</sub>
 
 ## Development
 
