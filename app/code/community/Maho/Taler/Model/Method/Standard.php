@@ -230,6 +230,12 @@ class Maho_Taler_Model_Method_Standard extends Mage_Payment_Model_Method_Abstrac
         $payment->setAdditionalInformation('taler_wired', empty($statusResponse['wired']) ? '0' : '1');
         $payment->save();
 
+        // registerCaptureNotification() never calls capture(), so set the
+        // transaction here. It ends up on the invoice, and the admin only
+        // offers an online "Refund" for invoices that carry one.
+        $payment->setTransactionId((string) $payment->getAdditionalInformation('taler_order_id'));
+        $payment->setIsTransactionClosed(true);
+
         // The wallet pays in the order currency, but registerCaptureNotification()
         // expects a base-currency amount: it compares against getBaseGrandTotal()
         // in _isCaptureFinal() and stores it as base_amount_paid_online. Taler
