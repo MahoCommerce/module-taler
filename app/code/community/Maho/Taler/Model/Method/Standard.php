@@ -84,7 +84,7 @@ class Maho_Taler_Model_Method_Standard extends Mage_Payment_Model_Method_Abstrac
                 }
             }
         } catch (\Throwable) {
-            $storeId = null;
+            // Keep $storeId null: the helper then uses the default store config.
         }
 
         $statusCode = $this->_getTalerHelper()->getPendingStatus($storeId);
