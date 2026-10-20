@@ -18,10 +18,36 @@ import { expect, test, type Locator, type Page } from '@playwright/test';
 const repoRoot = fileURLToPath(new URL('../..', import.meta.url));
 const screenshotsDir = process.env.TALER_SCREENSHOTS_DIR;
 
-async function screenshot(target: Page | Locator, name: string): Promise<void> {
-    if (screenshotsDir) {
-        await target.screenshot({ path: resolve(screenshotsDir, `${name}.png`), animations: 'disabled' });
+/**
+ * Saves a README screenshot of the area that covers all the given elements,
+ * on a light frame so it stands out from the README text.
+ */
+async function screenshot(page: Page, name: string, areas: Locator[], margin = 16): Promise<void> {
+    if (!screenshotsDir) {
+        return;
     }
+    await areas[0].scrollIntoViewIfNeeded();
+    const boxes = await Promise.all(areas.map((area) => area.boundingBox()));
+    const viewport = page.viewportSize()!;
+    const left = Math.max(0, Math.min(...boxes.map((box) => box!.x)) - margin);
+    const top = Math.max(0, Math.min(...boxes.map((box) => box!.y)) - margin);
+    const right = Math.min(viewport.width, Math.max(...boxes.map((box) => box!.x + box!.width)) + margin);
+    const bottom = Math.min(viewport.height, Math.max(...boxes.map((box) => box!.y + box!.height)) + margin);
+    const width = Math.round(right - left);
+    const shot = await page.screenshot({
+        clip: { x: left, y: top, width, height: bottom - top },
+        animations: 'disabled',
+    });
+
+    const frame = await page.context().newPage();
+    await frame.setContent(`<body style="margin:0">
+        <div id="frame" style="display:inline-block;padding:24px;background:#eef1f5;border-radius:12px">
+            <img src="data:image/png;base64,${shot.toString('base64')}"
+                style="display:block;width:${width}px;border-radius:6px;box-shadow:0 2px 12px rgba(0,0,0,.18)">
+        </div>
+    </body>`);
+    await frame.locator('#frame').screenshot({ path: resolve(screenshotsDir, `${name}.png`), omitBackground: true });
+    await frame.close();
 }
 
 function wallet(...args: string[]): string {
@@ -102,7 +128,7 @@ test('a guest pays with GNU Taler and comes back to an invoiced order', async ({
     // Every field change saves its checkout section over AJAX. Placing the
     // order while a save is in flight races it, so wait for them to settle.
     await page.waitForLoadState('networkidle');
-    await screenshot(page.locator('.onestep-column-right'), 'checkout');
+    await screenshot(page, 'checkout', [page.locator('#onestep-payment'), page.locator('#onestep-review')]);
 
     // Placing the order redirects to the backend-hosted payment page.
     await page.getByRole('button', { name: 'Place Order' }).click();
@@ -110,7 +136,11 @@ test('a guest pays with GNU Taler and comes back to an invoiced order', async ({
 
     const payUri = (await page.content()).match(/taler:\/\/pay\/[^"'<\s]+/)?.[0];
     expect(payUri, 'the payment page shows a taler://pay URI').toBeTruthy();
-    await screenshot(page, 'payment-page');
+    await screenshot(page, 'payment-page', [
+        page.getByRole('heading', { name: 'Pay with GNU Taler' }),
+        page.getByText('Scan this code with the Taler wallet'),
+        page.getByText('No wallet yet?'),
+    ], 40);
 
     // handle-uri waits for the payment to finish.
     wallet('handle-uri', '-y', payUri!.replaceAll('&amp;', '&'));
@@ -168,7 +198,15 @@ test('online credit memos from the admin refund the order in the Taler backend, 
     // Update Totals reloads the totals block, including the Refund button.
     await page.waitForLoadState('networkidle');
     await page.getByRole('button', { name: 'Refund', exact: true }).scrollIntoViewIfNeeded();
-    await screenshot(page, 'admin-credit-memo');
+    const refundTotals = page.locator('.entry-edit:has(> .entry-edit-head h4:text-is("Refund Totals"))');
+    if (screenshotsDir) {
+        // The box fills half the page with the totals on its right; shrink it to them.
+        await refundTotals.evaluate((box: HTMLElement) => {
+            box.style.width = 'max-content';
+            box.querySelectorAll('table').forEach((table) => (table.style.width = 'auto'));
+        });
+    }
+    await screenshot(page, 'admin-credit-memo', [refundTotals]);
     await page.getByRole('button', { name: 'Refund', exact: true }).click();
     await expect(page.getByText('The credit memo has been created.')).toBeVisible();
 
@@ -186,7 +224,7 @@ test('online credit memos from the admin refund the order in the Taler backend, 
     await page.getByRole('button', { name: 'Refund', exact: true }).click();
     await expect(page.getByText('The credit memo has been created.')).toBeVisible();
 
-    await screenshot(page.locator('#order_history_block .note-list'), 'admin-refund-history');
+    await screenshot(page, 'admin-refund-history', [page.locator('#order_history_block .note-list')]);
 
     const full = inspect<OrderInfo>('order', incrementId!);
     expect(full.creditmemos).toBe(2);

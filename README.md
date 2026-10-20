@@ -71,19 +71,19 @@ The [browser tests](#browser-tests) take these screenshots against the public de
 
 GNU Taler at checkout:
 
-![GNU Taler selected as the payment method at checkout](.github/screenshots/checkout.png)
+<img src=".github/screenshots/checkout.png" alt="GNU Taler selected as the payment method at checkout" width="527">
 
 The backend payment page, with the QR code for a phone wallet and a button for the browser wallet:
 
-![The GNU Taler payment page with a QR code](.github/screenshots/payment-page.png)
+<img src=".github/screenshots/payment-page.png" alt="The GNU Taler payment page with a QR code">
 
 An online refund in the admin. Open the invoice and click **Credit Memo**: the **Credit Memo** button of the order creates offline refunds only.
 
-![A new credit memo with the online Refund button](.github/screenshots/admin-credit-memo.png)
+<img src=".github/screenshots/admin-credit-memo.png" alt="The refund totals of a new credit memo, with the online Refund button" width="329">
 
 The order history after a partial refund and a second refund for the rest:
 
-![Order comments with the capture and two online refunds](.github/screenshots/admin-refund-history.png)
+<img src=".github/screenshots/admin-refund-history.png" alt="Order comments with the capture and two online refunds" width="554">
 
 ## Development
 

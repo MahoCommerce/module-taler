@@ -17,7 +17,16 @@ export default defineConfig({
         trace: 'retain-on-failure',
         screenshot: 'only-on-failure',
     },
-    projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
+    projects: [
+        {
+            name: 'chromium',
+            use: {
+                ...devices['Desktop Chrome'],
+                // Sharp README screenshots on high-density screens.
+                ...(process.env.TALER_SCREENSHOTS_DIR ? { deviceScaleFactor: 2, viewport: { width: 1280, height: 1000 } } : {}),
+            },
+        },
+    ],
     webServer: {
         command: `php maho serve ${port}`,
         cwd: '../..',
