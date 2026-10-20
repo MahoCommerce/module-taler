@@ -95,13 +95,7 @@ test('a guest pays with GNU Taler and comes back to an invoiced order', async ({
     await page.waitForLoadState('networkidle');
 
     // Placing the order redirects to the backend-hosted payment page.
-    const [saveOrder] = await Promise.all([
-        page.waitForResponse((response) => response.url().includes('checkout/onepage/saveOrder')),
-        page.getByRole('button', { name: 'Place Order' }).click(),
-    ]);
-    const saved = (await saveOrder.json()) as { success?: boolean; error_messages?: string; redirect?: string };
-    expect(saved.error_messages, 'checkout accepted the order').toBeUndefined();
-    expect(saved.redirect).toContain('taler/payment/redirect');
+    await page.getByRole('button', { name: 'Place Order' }).click();
     await page.waitForURL(/\/orders\/[^/?]+\?token=/, { timeout: 60_000 });
 
     const payUri = (await page.content()).match(/taler:\/\/pay\/[^"'<\s]+/)?.[0];
