@@ -6,6 +6,9 @@
     "require": {
         "php": ">=8.5"
     },
+    "conflict": {
+        "mahocommerce/maho": "<26.9"
+    },
     "require-dev": {
         "friendsofphp/php-cs-fixer": "*",
         "mahocommerce/maho": ">=26.9",
