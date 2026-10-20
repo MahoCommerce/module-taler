@@ -1,6 +1,7 @@
 import { execFileSync } from 'node:child_process';
+import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { expect, test } from '@playwright/test';
+import { expect, test, type Locator, type Page } from '@playwright/test';
 
 /**
  * End-to-end storefront test: a guest buys the product created by setup.php,
@@ -10,10 +11,18 @@ import { expect, test } from '@playwright/test';
  * browser back to the store, and the order must end up invoiced.
  *
  * Env: TALER_WALLET_CLI (wallet binary, default taler-wallet-cli),
- * TALER_WALLET_BANK_URL / TALER_WALLET_EXCHANGE_URL (withdraw endpoints).
+ * TALER_WALLET_BANK_URL / TALER_WALLET_EXCHANGE_URL (withdraw endpoints),
+ * TALER_SCREENSHOTS_DIR (save the README screenshots there).
  */
 
 const repoRoot = fileURLToPath(new URL('../..', import.meta.url));
+const screenshotsDir = process.env.TALER_SCREENSHOTS_DIR;
+
+async function screenshot(target: Page | Locator, name: string): Promise<void> {
+    if (screenshotsDir) {
+        await target.screenshot({ path: resolve(screenshotsDir, `${name}.png`), animations: 'disabled' });
+    }
+}
 
 function wallet(...args: string[]): string {
     return execFileSync(process.env.TALER_WALLET_CLI ?? 'taler-wallet-cli', args, {
@@ -93,6 +102,7 @@ test('a guest pays with GNU Taler and comes back to an invoiced order', async ({
     // Every field change saves its checkout section over AJAX. Placing the
     // order while a save is in flight races it, so wait for them to settle.
     await page.waitForLoadState('networkidle');
+    await screenshot(page.locator('.onestep-column-right'), 'checkout');
 
     // Placing the order redirects to the backend-hosted payment page.
     await page.getByRole('button', { name: 'Place Order' }).click();
@@ -100,6 +110,7 @@ test('a guest pays with GNU Taler and comes back to an invoiced order', async ({
 
     const payUri = (await page.content()).match(/taler:\/\/pay\/[^"'<\s]+/)?.[0];
     expect(payUri, 'the payment page shows a taler://pay URI').toBeTruthy();
+    await screenshot(page, 'payment-page');
 
     // handle-uri waits for the payment to finish.
     wallet('handle-uri', '-y', payUri!.replaceAll('&amp;', '&'));
@@ -154,6 +165,10 @@ test('online credit memos from the admin refund the order in the Taler backend, 
     await newCreditMemoFromInvoice();
     await page.locator('#shipping_amount').fill('0');
     await page.getByRole('button', { name: 'Update Totals' }).click();
+    // Update Totals reloads the totals block, including the Refund button.
+    await page.waitForLoadState('networkidle');
+    await page.getByRole('button', { name: 'Refund', exact: true }).scrollIntoViewIfNeeded();
+    await screenshot(page, 'admin-credit-memo');
     await page.getByRole('button', { name: 'Refund', exact: true }).click();
     await expect(page.getByText('The credit memo has been created.')).toBeVisible();
 
@@ -170,6 +185,8 @@ test('online credit memos from the admin refund the order in the Taler backend, 
     await newCreditMemoFromInvoice();
     await page.getByRole('button', { name: 'Refund', exact: true }).click();
     await expect(page.getByText('The credit memo has been created.')).toBeVisible();
+
+    await screenshot(page.locator('#order_history_block .note-list'), 'admin-refund-history');
 
     const full = inspect<OrderInfo>('order', incrementId!);
     expect(full.creditmemos).toBe(2);

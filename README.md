@@ -65,6 +65,26 @@ Amounts are expressed in Taler's `CURRENCY:VALUE.FRACTION` format (e.g. `EUR:10.
 3. **Confirmation** — The module verifies `GET /private/orders/{order_id}` server-side on return; a 5-minute cron safety net captures orders whose customers never returned and cancels expired ones. Confirmed payments are captured and invoiced.
 4. **Refunds** — Full and partial refunds are issued from the Maho admin (online creditmemos) via `POST /private/orders/{order_id}/refund`.
 
+## Screenshots
+
+The [browser tests](#browser-tests) take these screenshots against the public demo backend.
+
+GNU Taler at checkout:
+
+![GNU Taler selected as the payment method at checkout](.github/screenshots/checkout.png)
+
+The backend payment page, with the QR code for a phone wallet and a button for the browser wallet:
+
+![The GNU Taler payment page with a QR code](.github/screenshots/payment-page.png)
+
+An online refund in the admin. Open the invoice and click **Credit Memo**: the **Credit Memo** button of the order creates offline refunds only.
+
+![A new credit memo with the online Refund button](.github/screenshots/admin-credit-memo.png)
+
+The order history after a partial refund and a second refund for the rest:
+
+![Order comments with the capture and two online refunds](.github/screenshots/admin-refund-history.png)
+
 ## Development
 
 This module ships with the standard Maho CI gates:
@@ -121,6 +141,8 @@ npm ci
 npx playwright install chromium
 npx playwright test
 ```
+
+To update the screenshots in this README, run the tests with `TALER_SCREENSHOTS_DIR=../../.github/screenshots npx playwright test` and commit the new images.
 
 `setup.php` switches the store currency to the backend currency (KUDOS) and creates a test product, so use a disposable installation. The test starts `php maho serve` on port 8000 unless a server already runs there. Set `TALER_WALLET_CLI` when the wallet binary is not on the `PATH` (for example a Docker wrapper on macOS).
 

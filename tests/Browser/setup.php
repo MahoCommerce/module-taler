@@ -54,6 +54,8 @@ $currency = (string) Mage::getModel('maho_taler/api', ['store_id' => 0])->getCon
 $save('currency/options/base', $currency);
 $save('currency/options/default', $currency);
 $save('currency/options/allow', $currency);
+// Without a symbol, the formatter cuts the 5-letter code to "KUD".
+$save('currency/options/customsymbol', (string) json_encode([$currency => $currency]));
 
 $save('carriers/flatrate/active', '1');
 $save('carriers/flatrate/type', 'O');
