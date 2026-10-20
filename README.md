@@ -14,7 +14,7 @@ Unlike card gateways, Taler does not process cards or hold merchant funds. You r
 ## Requirements
 
 - PHP >= 8.5
-- Maho Commerce >= 26.5
+- Maho Commerce >= 26.9
 - Access to a [GNU Taler merchant backend](https://docs.taler.net/taler-merchant-manual.html) instance and the API access token for one of its instances
 
 ## Installation
