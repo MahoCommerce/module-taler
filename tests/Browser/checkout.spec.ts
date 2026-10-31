@@ -5,10 +5,11 @@ import { expect, test, type Locator, type Page } from '@playwright/test';
 
 /**
  * End-to-end storefront test: a guest buys the product created by setup.php,
- * picks GNU Taler, lands on the merchant backend's payment page, and a
- * headless wallet (taler-wallet-cli) pays the taler://pay URI shown there,
- * like a phone wallet scanning the QR code. The backend page then sends the
- * browser back to the store, and the order must end up invoiced.
+ * picks GNU Taler, lands on the store payment page, and a headless wallet
+ * (taler-wallet-cli) pays the taler://pay URI shown there, like a phone
+ * wallet scanning the QR code. The page polls the store, which sends the
+ * browser to the success page, and the order must end up invoiced. A second
+ * checkout does the same through the payment page of the merchant backend.
  *
  * Env: TALER_WALLET_CLI (wallet binary, default taler-wallet-cli),
  * TALER_WALLET_BANK_URL / TALER_WALLET_EXCHANGE_URL (withdraw endpoints),
@@ -89,7 +90,7 @@ function talerValue(amount: string | undefined): number {
     return Number(amount?.split(':')[1]);
 }
 
-function inspect<T>(command: 'product' | 'order', argument: string): T {
+function inspect<T>(command: 'product' | 'order' | 'config', argument: string): T {
     const json = execFileSync('php', ['tests/Browser/inspect.php', command, argument], { cwd: repoRoot, encoding: 'utf8' });
     return JSON.parse(json) as T;
 }
@@ -99,9 +100,11 @@ test.describe.configure({ mode: 'serial' });
 
 let incrementId: string | undefined;
 
-test('a guest pays with GNU Taler and comes back to an invoiced order', async ({ page }) => {
-    fundWallet('KUDOS:5');
-
+/**
+ * Fills the one-page checkout as a guest up to the point where the order
+ * can be placed with GNU Taler.
+ */
+async function checkoutAsGuest(page: Page): Promise<void> {
     const product = inspect<{ id: number }>('product', 'taler-browser-test');
     await page.goto(`catalog/product/view/id/${product.id}/`);
     await page.locator('#product_addtocart_form .btn-cart').first().click();
@@ -128,32 +131,15 @@ test('a guest pays with GNU Taler and comes back to an invoiced order', async ({
     // Every field change saves its checkout section over AJAX. Placing the
     // order while a save is in flight races it, so wait for them to settle.
     await page.waitForLoadState('networkidle');
-    await screenshot(page, 'checkout', [page.locator('#onestep-payment'), page.locator('#onestep-review')]);
+}
 
-    // Placing the order redirects to the backend-hosted payment page.
-    await page.getByRole('button', { name: 'Place Order' }).click();
-    await page.waitForURL(/\/orders\/[^/?]+\?token=/, { timeout: 60_000 });
-
-    const payUri = (await page.content()).match(/taler:\/\/pay\/[^"'<\s]+/)?.[0];
-    expect(payUri, 'the payment page shows a taler://pay URI').toBeTruthy();
-    await screenshot(page, 'payment-page', [
-        page.getByRole('heading', { name: 'Pay with GNU Taler' }),
-        page.getByText('Scan this code with the Taler wallet'),
-        page.getByText('No wallet yet?'),
-    ], 40);
-
-    // handle-uri waits for the payment to finish.
-    wallet('handle-uri', '-y', payUri!.replaceAll('&amp;', '&'));
-
-    // The backend page long-polls, then redirects to the fulfillment URL;
-    // the module verifies the payment server-side and shows the success page.
-    await page.waitForURL(/checkout\/onepage\/success/, { timeout: 90_000 });
-
+/** Checks the success page and the invoiced order, and returns its increment id. */
+async function expectInvoicedOrder(page: Page): Promise<string> {
     await expect(page.getByRole('heading', { name: 'Your order has been received.' })).toBeVisible();
-    incrementId = (await page.getByText(/Your order # is:/).textContent())?.match(/\d+/)?.[0];
-    expect(incrementId, 'the success page shows the order number').toBeTruthy();
+    const paidIncrementId = (await page.getByText(/Your order # is:/).textContent())?.match(/\d+/)?.[0];
+    expect(paidIncrementId, 'the success page shows the order number').toBeTruthy();
 
-    const order = inspect<OrderInfo>('order', incrementId!);
+    const order = inspect<OrderInfo>('order', paidIncrementId!);
     expect(order.payment_method).toBe('taler');
     expect(order.currency).toBe('KUDOS');
     expect(order.taler_order_id).toBeTruthy();
@@ -161,6 +147,34 @@ test('a guest pays with GNU Taler and comes back to an invoiced order', async ({
     expect(order.state).toBe('processing');
     expect(order.invoices).toBe(1);
     expect(order.total_paid).toBe(order.grand_total);
+    return paidIncrementId!;
+}
+
+test('a guest pays with GNU Taler on the store page and comes back to an invoiced order', async ({ page }) => {
+    fundWallet('KUDOS:5');
+    await checkoutAsGuest(page);
+
+    await expect(page.getByText('Pay with digital cash from your GNU Taler wallet.')).toBeVisible();
+    await screenshot(page, 'checkout', [page.locator('#onestep-payment'), page.locator('#onestep-review')]);
+
+    // Placing the order opens the store payment page.
+    await page.getByRole('button', { name: 'Place Order' }).click();
+    await page.waitForURL(/\/taler\/payment\/pay/, { timeout: 60_000 });
+
+    const payLink = page.getByRole('link', { name: 'Open in wallet' });
+    const payUri = await payLink.getAttribute('href');
+    expect(payUri, 'the payment page links a taler://pay URI').toMatch(/^taler:\/\/pay\//);
+    await expect(page.locator('.taler-qr-code svg')).toBeVisible();
+    await screenshot(page, 'payment-page', [page.locator('.taler-payment')], 40);
+
+    // handle-uri waits for the payment to finish, as a phone wallet that
+    // scans the QR code would.
+    wallet('handle-uri', '-y', payUri!);
+
+    // The page polls the store, which checks the backend and then opens
+    // the success page.
+    await page.waitForURL(/checkout\/onepage\/success/, { timeout: 90_000 });
+    incrementId = await expectInvoicedOrder(page);
 });
 
 test('online credit memos from the admin refund the order in the Taler backend, partially and then fully', async ({ page }) => {
@@ -231,4 +245,27 @@ test('online credit memos from the admin refund the order in the Taler backend, 
     expect(full.total_refunded).toBe(paid.grand_total);
     expect(full.state).toBe('closed');
     expect(talerValue(full.backend?.refund_amount)).toBe(paid.grand_total);
+});
+
+test('with the backend payment page setting, the guest pays on the page of the Taler backend', async ({ page }) => {
+    fundWallet('KUDOS:5');
+    inspect('config', 'payment/taler/payment_page=backend');
+    try {
+        await checkoutAsGuest(page);
+        await expect(page.getByText('you go to the GNU Taler payment page')).toBeVisible();
+
+        await page.getByRole('button', { name: 'Place Order' }).click();
+        await page.waitForURL(/\/orders\/[^/?]+\?token=/, { timeout: 60_000 });
+
+        const payUri = (await page.content()).match(/taler:\/\/pay\/[^"'<\s]+/)?.[0];
+        expect(payUri, 'the backend payment page shows a taler://pay URI').toBeTruthy();
+        wallet('handle-uri', '-y', payUri!.replaceAll('&amp;', '&'));
+
+        // The backend page long-polls, then opens the fulfillment URL; the
+        // module checks the payment on the server and shows the success page.
+        await page.waitForURL(/checkout\/onepage\/success/, { timeout: 90_000 });
+        await expectInvoicedOrder(page);
+    } finally {
+        inspect('config', 'payment/taler/payment_page=store');
+    }
 });

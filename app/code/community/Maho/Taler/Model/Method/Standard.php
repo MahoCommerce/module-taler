@@ -42,15 +42,21 @@ class Maho_Taler_Model_Method_Standard extends Mage_Payment_Model_Method_Abstrac
     protected ?Maho_Taler_Model_Api $_api = null;
 
     /**
-     * No currency check here: the currency a backend accepts is only known
-     * from its /config endpoint, which we don't want to hit on every checkout
-     * render. A mismatch fails cleanly at redirect time (the backend rejects
-     * the order with a currency-mismatch error) and the cart is restored.
+     * The currency check uses the "Accepted Currency" setting, so the
+     * checkout makes no API call. The configuration save reads that setting
+     * from the backend /config when it is empty. When it stays empty, the
+     * backend rejects a wrong currency at redirect time and the cart is
+     * restored.
      */
     #[\Override]
     public function isAvailable($quote = null): bool
     {
-        if (!$this->_getTalerHelper()->hasCredentials($quote?->getStoreId())) {
+        $helper = $this->_getTalerHelper();
+        $storeId = $quote?->getStoreId() !== null ? (int) $quote->getStoreId() : null;
+        if (!$helper->hasCredentials($storeId)) {
+            return false;
+        }
+        if ($quote !== null && !$helper->isCurrencyAccepted((string) $quote->getQuoteCurrencyCode(), $storeId)) {
             return false;
         }
         return parent::isAvailable($quote);
@@ -127,6 +133,13 @@ class Maho_Taler_Model_Method_Standard extends Mage_Payment_Model_Method_Abstrac
 
         $incrementId = (string) $order->getIncrementId();
         $currency = (string) $order->getOrderCurrencyCode();
+        if (!$helper->isCurrencyAccepted($currency, $storeId)) {
+            Mage::throwException($helper->__(
+                'The Taler backend accepts %s, but the order is in %s.',
+                $helper->getCurrency($storeId),
+                $currency,
+            ));
+        }
         // Amount in the order currency: the customer pays exactly what
         // checkout displayed. Capture later registers the base grand total.
         $amount = $helper->formatAmount($currency, (float) $order->getGrandTotal());

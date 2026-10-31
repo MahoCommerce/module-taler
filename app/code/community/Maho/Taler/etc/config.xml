@@ -6,7 +6,7 @@ SPDX-License-Identifier: OSL-3.0
 <config>
     <modules>
         <Maho_Taler>
-            <version>2.0.0</version>
+            <version>2.1.0</version>
         </Maho_Taler>
     </modules>
 
@@ -37,8 +37,16 @@ SPDX-License-Identifier: OSL-3.0
     </global>
 
     <frontend>
+        <layout>
+            <updates>
+                <maho_taler>
+                    <file>maho_taler.xml</file>
+                </maho_taler>
+            </updates>
+        </layout>
         <secure_url>
             <maho_taler_payment>/taler/payment</maho_taler_payment>
+            <maho_taler_webhook>/taler/webhook</maho_taler_webhook>
         </secure_url>
         <translate>
             <modules>
@@ -57,7 +65,10 @@ SPDX-License-Identifier: OSL-3.0
                 <backend_url/>
                 <instance/>
                 <api_token backend_model="adminhtml/system_config_backend_encrypted"/>
+                <currency/>
                 <refund_delay_days>14</refund_delay_days>
+                <webhook>1</webhook>
+                <webhook_secret backend_model="adminhtml/system_config_backend_encrypted"/>
                 <debug>0</debug>
             </connection>
         </maho_taler>
@@ -69,6 +80,7 @@ SPDX-License-Identifier: OSL-3.0
                 <group>maho_taler</group>
                 <allowspecific>0</allowspecific>
                 <sort_order>100</sort_order>
+                <payment_page>store</payment_page>
                 <payment_action>order</payment_action>
                 <order_status_pending>pending_payment</order_status_pending>
                 <order_status_processing>processing</order_status_processing>

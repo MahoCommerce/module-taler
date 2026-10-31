@@ -102,9 +102,10 @@ jobs:
                   TALER_API_TOKEN: ${{ secrets.TALER_API_TOKEN || 'sandbox' }}
               run: XDEBUG_MODE=off php vendor/bin/pest --testsuite Integration
 
-    # Real storefront checkout in Chromium: a guest pays through the Taler
-    # backend's payment page (taler-wallet-cli pays the taler://pay URI it
-    # shows), returns to the store, and an admin refunds the invoice online.
+    # Real storefront checkout in Chromium: a guest pays on the store payment
+    # page (taler-wallet-cli pays the taler://pay URI it shows), the page
+    # polling opens the success page, and an admin refunds the invoice online.
+    # A second checkout pays through the Taler backend's payment page.
     # The Node tooling lives in tests/Browser, which Composer downloads skip.
     browser:
         runs-on: ubuntu-latest

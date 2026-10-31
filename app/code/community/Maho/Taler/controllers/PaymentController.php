@@ -11,6 +11,11 @@ declare(strict_types=1);
 class Maho_Taler_PaymentController extends Mage_Core_Controller_Front_Action
 {
     /**
+     * Each poll of the store page holds a PHP worker for this long at most.
+     */
+    public const STATUS_POLL_TIMEOUT_MS = 10000;
+
+    /**
      * Create the order in the Taler merchant backend and redirect the
      * customer to the backend-hosted payment page (QR code / wallet handoff).
      */
@@ -45,6 +50,12 @@ class Maho_Taler_PaymentController extends Mage_Core_Controller_Front_Action
             $session->setTalerQuoteId($session->getQuoteId());
             $session->unsQuoteId();
 
+            /** @var Maho_Taler_Helper_Data $helper */
+            $helper = Mage::helper('maho_taler');
+            if ($helper->getPaymentPage((int) $order->getStoreId()) === Maho_Taler_Helper_Data::PAYMENT_PAGE_STORE) {
+                $this->_redirect('taler/payment/pay', ['_secure' => true]);
+                return;
+            }
             $this->getResponse()->setRedirect($redirectUrl);
         } catch (\Throwable $e) {
             Mage::logException($e);
@@ -54,6 +65,60 @@ class Maho_Taler_PaymentController extends Mage_Core_Controller_Front_Action
             $this->_restoreCart($order);
             $this->_redirect('checkout/cart');
         }
+    }
+
+    /**
+     * Store payment page: QR code, wallet link and polling. Only for the
+     * order of the checkout session.
+     */
+    #[Maho\Config\Route('/taler/payment/pay', methods: ['GET'])]
+    public function payAction(): void
+    {
+        $order = $this->_getPendingSessionOrder();
+        if ($order === null) {
+            $this->_redirect('checkout/cart');
+            return;
+        }
+
+        Mage::register('taler_order', $order);
+        $this->loadLayout();
+        $head = $this->getLayout()->getBlock('head');
+        if ($head instanceof Mage_Page_Block_Html_Head) {
+            $head->setTitle(Mage::helper('maho_taler')->__('Pay with GNU Taler'));
+        }
+        $this->renderLayout();
+    }
+
+    /**
+     * Poll endpoint of the store payment page. It long-polls the backend for
+     * a short time, finalizes the order when it is paid, and tells the page
+     * when to leave.
+     */
+    #[Maho\Config\Route('/taler/payment/status', methods: ['GET'])]
+    public function statusAction(): void
+    {
+        $order = $this->_getSessionOrder();
+        $done = true;
+        if ($order !== null && $order->getState() === Mage_Sales_Model_Order::STATE_PENDING_PAYMENT) {
+            // A long-poll must not keep the session locked: the customer can
+            // use the store in another tab in the meantime.
+            session_write_close();
+            try {
+                /** @var Maho_Taler_Model_Cron $cron */
+                $cron = Mage::getModel('maho_taler/cron');
+                $order = $cron->processPaymentStatus($order, false, self::STATUS_POLL_TIMEOUT_MS);
+            } catch (\Throwable $e) {
+                Mage::logException($e);
+            }
+            $done = $order->getState() !== Mage_Sales_Model_Order::STATE_PENDING_PAYMENT;
+        }
+
+        $this->getResponse()->setHeader('Content-Type', 'application/json', true);
+        $this->getResponse()->setHeader('Cache-Control', 'no-store', true);
+        $this->getResponse()->setBody((string) Mage::helper('core')->jsonEncode([
+            'done' => $done,
+            'redirect' => Mage::getUrl('taler/payment/success', ['_secure' => true]),
+        ]));
     }
 
     /**
@@ -101,7 +166,9 @@ class Maho_Taler_PaymentController extends Mage_Core_Controller_Front_Action
             try {
                 // Short long-poll bridges the race between the wallet's pay
                 // and the backend marking the order paid.
-                Mage::getModel('maho_taler/cron')->processPaymentStatus($order, true, 3000);
+                /** @var Maho_Taler_Model_Cron $cron */
+                $cron = Mage::getModel('maho_taler/cron');
+                $order = $cron->processPaymentStatus($order, true, 3000);
             } catch (\Throwable $e) {
                 Mage::logException($e);
             }
@@ -137,25 +204,90 @@ class Maho_Taler_PaymentController extends Mage_Core_Controller_Front_Action
     }
 
     /**
-     * Manual bail-out from the payment page ("back to store" style links).
-     * The backend page has no cancel callback of its own, so this is only
-     * reachable through links we render ourselves.
+     * The "Back to cart" button of the store payment page. The backend page
+     * has no cancel callback of its own.
+     *
+     * A payment can arrive while the customer clicks, so check the backend
+     * first. The unpaid order is then deleted in the backend before the
+     * cancel, so the wallet cannot pay it later.
      */
-    #[Maho\Config\Route('/taler/payment/cancel')]
+    #[Maho\Config\Route('/taler/payment/cancel', methods: ['POST'])]
     public function cancelAction(): void
     {
-        $session = Mage::getSingleton('checkout/session');
-        $session->setQuoteId($session->getTalerQuoteId(true));
-
-        $orderIncrementId = $session->getLastRealOrderId();
-        if ($orderIncrementId) {
-            $order = Mage::getModel('sales/order')->loadByIncrementId($orderIncrementId);
-            if ($order->getId()) {
-                $this->_restoreCart($order);
-            }
+        if (!$this->_validateFormKey()) {
+            $this->_redirect('checkout/cart');
+            return;
         }
 
+        $order = $this->_getPendingSessionOrder();
+        if ($order === null) {
+            $this->_redirect('checkout/cart');
+            return;
+        }
+
+        try {
+            /** @var Maho_Taler_Model_Cron $cron */
+            $cron = Mage::getModel('maho_taler/cron');
+            $order = $cron->processPaymentStatus($order, false);
+        } catch (\Throwable $e) {
+            Mage::logException($e);
+        }
+        if ($order->getState() !== Mage_Sales_Model_Order::STATE_PENDING_PAYMENT) {
+            $this->_redirect('taler/payment/success', ['_secure' => true]);
+            return;
+        }
+
+        try {
+            /** @var Maho_Taler_Model_Api $api */
+            $api = Mage::getModel('maho_taler/api', ['store_id' => (int) $order->getStoreId()]);
+            $api->deleteOrder($this->_getTalerOrderId($order), true);
+        } catch (Maho_Taler_Model_Api_NotFoundException) {
+            // Already gone in the backend.
+        } catch (\Throwable $e) {
+            // The backend never deletes a paid order: the wallet paid while
+            // the customer clicked. Finalize it instead.
+            Mage::logException($e);
+            $this->_redirect('taler/payment/success', ['_secure' => true]);
+            return;
+        }
+
+        $session = Mage::getSingleton('checkout/session');
+        $session->setQuoteId($session->getTalerQuoteId(true));
+        $this->_restoreCart($order);
         $this->_redirect('checkout/cart');
+    }
+
+    protected function _getSessionOrder(): ?Mage_Sales_Model_Order
+    {
+        $incrementId = (string) Mage::getSingleton('checkout/session')->getLastRealOrderId();
+        if ($incrementId === '') {
+            return null;
+        }
+        /** @var Mage_Sales_Model_Order $order */
+        $order = Mage::getModel('sales/order')->loadByIncrementId($incrementId);
+        $payment = $order->getId() ? $order->getPayment() : null;
+        if (!$payment || $payment->getMethod() !== 'taler') {
+            return null;
+        }
+        return $order;
+    }
+
+    protected function _getPendingSessionOrder(): ?Mage_Sales_Model_Order
+    {
+        $order = $this->_getSessionOrder();
+        if ($order === null
+            || $order->getState() !== Mage_Sales_Model_Order::STATE_PENDING_PAYMENT
+            || $this->_getTalerOrderId($order) === ''
+        ) {
+            return null;
+        }
+        return $order;
+    }
+
+    protected function _getTalerOrderId(Mage_Sales_Model_Order $order): string
+    {
+        $payment = $order->getPayment();
+        return $payment ? (string) $payment->getAdditionalInformation('taler_order_id') : '';
     }
 
     protected function _restoreCart(Mage_Sales_Model_Order $order): void

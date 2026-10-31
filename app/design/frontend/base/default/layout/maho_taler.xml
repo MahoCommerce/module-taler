@@ -1,0 +1,20 @@
+<?xml version="1.0"?>
+<!--
+SPDX-FileCopyrightText: 2026 Maho <https://mahocommerce.com>
+SPDX-License-Identifier: OSL-3.0
+-->
+<layout version="0.1.0">
+    <taler_payment_pay>
+        <reference name="root">
+            <action method="setTemplate"><template>page/1column.phtml</template></action>
+        </reference>
+        <reference name="head">
+            <block type="core/text" name="taler.support">
+                <action method="setText"><text><![CDATA[<meta name="taler-support" content="uri">]]></text></action>
+            </block>
+        </reference>
+        <reference name="content">
+            <block type="maho_taler/payment" name="taler.payment"/>
+        </reference>
+    </taler_payment_pay>
+</layout>

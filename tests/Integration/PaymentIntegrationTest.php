@@ -135,3 +135,34 @@ test('a real wallet pays an order, and refunds accumulate until the wallet colle
     }
     expect($afterPickup['refund_pending'])->toBeFalse();
 });
+
+test('a paid order is captured once, however many webhook calls and checks arrive', function (): void {
+    talerWalletEnsureFunds('KUDOS:10');
+
+    $order = taler_integration_create_order('KUDOS', 1.50);
+    $talerOrderId = taler_integration_taler_order_id($order);
+    talerApi()->createOrder(talerOrderSpec($talerOrderId, 1.50), ['d_us' => 86400000000]);
+    talerWallet('handle-uri', '-y', (string) talerApi()->getOrder($talerOrderId)['taler_pay_uri']);
+    foreach (range(1, 10) as $i) {
+        if ((talerApi()->getOrder($talerOrderId, 5000)['order_status'] ?? '') === 'paid') {
+            break;
+        }
+    }
+
+    /** @var Maho_Taler_Model_Webhook $webhook */
+    $webhook = Mage::getModel('maho_taler/webhook');
+    $body = (string) json_encode(['webhook_type' => 'pay', 'order_id' => $talerOrderId]);
+
+    // The backend can retry a webhook, and the store page polls at the
+    // same time: every call after the first must change nothing.
+    expect($webhook->handle(TALER_INTEGRATION_WEBHOOK_SECRET, $body))->toBe(Maho_Taler_Model_Webhook::HTTP_OK);
+    expect($webhook->handle(TALER_INTEGRATION_WEBHOOK_SECRET, $body))->toBe(Maho_Taler_Model_Webhook::HTTP_OK);
+    /** @var Maho_Taler_Model_Cron $cron */
+    $cron = Mage::getModel('maho_taler/cron');
+    $cron->processPaymentStatus($order, false);
+
+    $fresh = taler_integration_reload_order($order);
+    expect($fresh->getState())->toBe(Mage_Sales_Model_Order::STATE_PROCESSING)
+        ->and($fresh->getInvoiceCollection()->count())->toBe(1)
+        ->and((float) $fresh->getBaseTotalPaid())->toBe(1.50);
+});

@@ -46,6 +46,16 @@ SPDX-License-Identifier: OSL-3.0
                             <show_in_store>0</show_in_store>
                             <comment>Access token for the instance's /private API, with or without the "secret-token:" prefix.</comment>
                         </api_token>
+                        <currency translate="label comment">
+                            <label>Accepted Currency</label>
+                            <frontend_type>text</frontend_type>
+                            <config_path>maho_taler/connection/currency</config_path>
+                            <sort_order>35</sort_order>
+                            <show_in_default>1</show_in_default>
+                            <show_in_website>1</show_in_website>
+                            <show_in_store>0</show_in_store>
+                            <comment>Currency that the merchant backend accepts, for example EUR. Leave empty to read it from the backend when you save. Checkout hides GNU Taler when the cart currency is different.</comment>
+                        </currency>
                         <refund_delay_days translate="label comment">
                             <label>Refund Window (days)</label>
                             <frontend_type>text</frontend_type>
@@ -56,6 +66,17 @@ SPDX-License-Identifier: OSL-3.0
                             <show_in_store>0</show_in_store>
                             <comment>Refund window granted at order creation. After it passes, the Taler backend rejects refunds for the order.</comment>
                         </refund_delay_days>
+                        <webhook translate="label comment">
+                            <label>Payment Notifications (Webhook)</label>
+                            <frontend_type>select</frontend_type>
+                            <source_model>adminhtml/system_config_source_yesno</source_model>
+                            <config_path>maho_taler/connection/webhook</config_path>
+                            <sort_order>45</sort_order>
+                            <show_in_default>1</show_in_default>
+                            <show_in_website>1</show_in_website>
+                            <show_in_store>0</show_in_store>
+                            <comment>When you save, the module registers a "pay" webhook in the merchant backend, with a shared secret. The backend then tells the store about a payment immediately. The store must be reachable from the backend. A cron job checks pending payments every 5 minutes in all cases.</comment>
+                        </webhook>
                         <debug translate="label comment">
                             <label>Debug Logging</label>
                             <frontend_type>select</frontend_type>
@@ -96,6 +117,17 @@ SPDX-License-Identifier: OSL-3.0
                             <show_in_website>1</show_in_website>
                             <show_in_store>1</show_in_store>
                         </title>
+                        <payment_page translate="label comment">
+                            <label>Payment Page</label>
+                            <frontend_type>select</frontend_type>
+                            <source_model>maho_taler/system_config_source_paymentPage</source_model>
+                            <config_path>payment/taler/payment_page</config_path>
+                            <sort_order>25</sort_order>
+                            <show_in_default>1</show_in_default>
+                            <show_in_website>1</show_in_website>
+                            <show_in_store>1</show_in_store>
+                            <comment>Store page: the store shows the QR code and the wallet link, and opens the success page when the payment arrives. Taler backend page: the customer pays on the page of the merchant backend.</comment>
+                        </payment_page>
                         <allowspecific translate="label">
                             <label>Payment from Applicable Countries</label>
                             <frontend_type>allowspecific</frontend_type>
@@ -119,6 +151,28 @@ SPDX-License-Identifier: OSL-3.0
                                 <allowspecific>1</allowspecific>
                             </depends>
                         </specificcountry>
+                        <min_order_total translate="label comment">
+                            <label>Minimum Order Total</label>
+                            <frontend_type>text</frontend_type>
+                            <validate>validate-zero-or-greater</validate>
+                            <config_path>payment/taler/min_order_total</config_path>
+                            <sort_order>45</sort_order>
+                            <show_in_default>1</show_in_default>
+                            <show_in_website>1</show_in_website>
+                            <show_in_store>0</show_in_store>
+                            <comment>In the base currency. Leave empty for no limit.</comment>
+                        </min_order_total>
+                        <max_order_total translate="label comment">
+                            <label>Maximum Order Total</label>
+                            <frontend_type>text</frontend_type>
+                            <validate>validate-zero-or-greater</validate>
+                            <config_path>payment/taler/max_order_total</config_path>
+                            <sort_order>46</sort_order>
+                            <show_in_default>1</show_in_default>
+                            <show_in_website>1</show_in_website>
+                            <show_in_store>0</show_in_store>
+                            <comment>In the base currency. Leave empty for no limit.</comment>
+                        </max_order_total>
                         <sort_order translate="label">
                             <label>Sort Order</label>
                             <frontend_type>text</frontend_type>

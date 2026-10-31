@@ -60,51 +60,33 @@ class Maho_Taler_Model_Cron
 
     /**
      * Poll the merchant backend for the status of a pending order and
-     * finalize it (capture or cancel). Called from cron and from the
-     * return-from-payment flow, so it must be a no-op for orders already
-     * past pending_payment — that guard is also what makes reloading the
-     * success URL and concurrent cron passes harmless.
+     * finalize it (capture or cancel). Called from cron, the webhook, the
+     * store payment page and the return-from-payment flow, so several
+     * processes can handle one order at the same time.
+     *
+     * The backend call (which can long-poll for $timeoutMs) runs without a
+     * lock. The finalize step runs under a per-order lock on a freshly loaded
+     * order, so a payment is captured only once. Returns that fresh order:
+     * callers must use it instead of the object they passed in.
      *
      * $logNoAction controls whether a still-unpaid order writes a log line:
-     * useful on the customer-return flow where it documents *why* the
-     * customer was bounced back to the cart, pure noise on the recurring
-     * cron passes.
-     *
-     * $timeoutMs long-polls the status endpoint — the return flow uses a
-     * short one to bridge the race between the wallet paying and the
-     * backend registering it.
+     * useful on the customer-return flow, noise on the recurring cron passes.
      */
-    public function processPaymentStatus(Mage_Sales_Model_Order $order, bool $logNoAction = true, ?int $timeoutMs = null): void
+    public function processPaymentStatus(Mage_Sales_Model_Order $order, bool $logNoAction = true, ?int $timeoutMs = null): Mage_Sales_Model_Order
     {
         $helper = Mage::helper('maho_taler');
         $storeId = (int) $order->getStoreId();
 
         $payment = $order->getPayment();
         if (!$payment) {
-            return;
+            return $order;
         }
 
         $talerOrderId = (string) $payment->getAdditionalInformation('taler_order_id');
 
         if ($order->getState() !== Mage_Sales_Model_Order::STATE_PENDING_PAYMENT) {
-            // Reconciliation: a wallet can pay after we cancelled the order
-            // by expiry (there is no webhook to warn us). Only reachable via
-            // the return flow / manual checks — the cron scans pending only.
-            if ($order->isCanceled() && $talerOrderId !== '') {
-                try {
-                    $response = $this->_getApi($storeId)->getOrder($talerOrderId);
-                    if (($response['order_status'] ?? '') === 'paid') {
-                        $helper->log(
-                            "Taler: payment received for CANCELLED order #{$order->getIncrementId()} — manual reconciliation needed (refund it from the backend or reopen the order)",
-                            Mage::LOG_WARNING,
-                            $storeId,
-                        );
-                    }
-                } catch (\Throwable $e) {
-                    Mage::logException($e);
-                }
-            }
-            return;
+            $this->_warnIfPaidAfterCancel($order, $talerOrderId);
+            return $order;
         }
 
         if ($talerOrderId === '') {
@@ -113,16 +95,47 @@ class Maho_Taler_Model_Cron
                 Mage::LOG_WARNING,
                 $storeId,
             );
-            return;
+            return $order;
         }
 
         try {
             $response = $this->_getApi($storeId)->getOrder($talerOrderId, $timeoutMs);
         } catch (Maho_Taler_Model_Api_NotFoundException) {
-            // The backend no longer knows the order (deleted or expired
-            // there): it can never be paid, cancel it locally. No quote
-            // handling here — if the customer came back to the store,
-            // successAction already gave them their cart back.
+            $response = null;
+        }
+
+        /** @var Mage_Core_Model_Lock $lock */
+        $lock = Mage::getSingleton('core/lock');
+        $lockName = 'taler_order_' . $order->getId();
+        if (!$lock->acquire($lockName, true)) {
+            return $order;
+        }
+
+        try {
+            /** @var Mage_Sales_Model_Order $order */
+            $order = Mage::getModel('sales/order')->load($order->getId());
+            if ($order->getState() !== Mage_Sales_Model_Order::STATE_PENDING_PAYMENT) {
+                return $order;
+            }
+            $this->_applyBackendStatus($order, $talerOrderId, $response, $logNoAction);
+            return $order;
+        } finally {
+            $lock->release($lockName);
+        }
+    }
+
+    /**
+     * Capture or cancel a pending order from the backend status. A null
+     * status means the backend no longer knows the order.
+     */
+    protected function _applyBackendStatus(Mage_Sales_Model_Order $order, string $talerOrderId, ?array $response, bool $logNoAction): void
+    {
+        $helper = Mage::helper('maho_taler');
+        $storeId = (int) $order->getStoreId();
+
+        if ($response === null) {
+            // Deleted or expired in the backend, so it can never be paid. No
+            // quote handling: successAction already gave the cart back.
             $order->cancel()->save();
             $helper->log(
                 "Taler: cancelled order #{$order->getIncrementId()} (order unknown to the backend)",
@@ -134,7 +147,8 @@ class Maho_Taler_Model_Cron
 
         $orderStatus = (string) ($response['order_status'] ?? '');
 
-        if ($orderStatus === 'paid') {
+        $payment = $order->getPayment();
+        if ($orderStatus === 'paid' && $payment) {
             /** @var Maho_Taler_Model_Method_Standard $method */
             $method = $payment->getMethodInstance();
             if ($method->capturePaidOrder($order, $response)) {
@@ -147,10 +161,8 @@ class Maho_Taler_Model_Cron
             return;
         }
 
-        // "unpaid" or "claimed": the backend hasn't seen the coins *yet* —
-        // the customer may still have the payment page or QR code open, so
-        // the order stays in pending_payment until the window has clearly
-        // expired.
+        // "unpaid" or "claimed": the customer may still have the payment page
+        // or the QR code open, so keep the order until the window expires.
         $createdAt = $order->getCreatedAt();
         if ($createdAt !== null
             && strtotime($createdAt) < strtotime('-' . self::PAYMENT_EXPIRY_HOURS . ' hours')
@@ -168,6 +180,30 @@ class Maho_Taler_Model_Cron
                 Mage::LOG_INFO,
                 $storeId,
             );
+        }
+    }
+
+    /**
+     * A wallet can pay after the order was cancelled by expiry, for example
+     * when the webhook was not reachable. Log it for manual reconciliation.
+     */
+    protected function _warnIfPaidAfterCancel(Mage_Sales_Model_Order $order, string $talerOrderId): void
+    {
+        if (!$order->isCanceled() || $talerOrderId === '') {
+            return;
+        }
+        $storeId = (int) $order->getStoreId();
+        try {
+            $response = $this->_getApi($storeId)->getOrder($talerOrderId);
+            if (($response['order_status'] ?? '') === 'paid') {
+                Mage::helper('maho_taler')->log(
+                    "Taler: payment received for CANCELLED order #{$order->getIncrementId()}: manual reconciliation needed (refund it from the backend or reopen the order)",
+                    Mage::LOG_WARNING,
+                    $storeId,
+                );
+            }
+        } catch (\Throwable $e) {
+            Mage::logException($e);
         }
     }
 
