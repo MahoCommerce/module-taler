@@ -2,7 +2,7 @@
 
 ![Maho Commerce](https://img.shields.io/badge/Maho_Commerce-module-orange)
 ![License](https://img.shields.io/badge/license-OSL--3.0-blue)
-![PHP](https://img.shields.io/badge/php-%3E%3D8.5-8892BF)
+![PHP](https://img.shields.io/badge/php-%3E%3D8.5.1-8892BF)
 ![PHPStan Level](https://img.shields.io/badge/PHPStan-level%208-brightgreen)
 
 Accept payments through [GNU Taler](https://www.taler.net), the free and open source, privacy-preserving payment system. Shoppers pay from a Taler wallet (browser extension or mobile app) using digital cash — the payer stays anonymous while every transaction remains taxable and auditable on the merchant side.
@@ -13,7 +13,7 @@ Unlike card gateways, Taler does not process cards or hold merchant funds. You r
 
 ## Requirements
 
-- PHP >= 8.5
+- PHP >= 8.5.1
 - Maho Commerce >= 26.9
 - Access to a [GNU Taler merchant backend](https://docs.taler.net/taler-merchant-manual.html) instance and the API access token for one of its instances
 

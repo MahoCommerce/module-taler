@@ -4,7 +4,7 @@
     "type": "maho-module",
     "license": ["OSL-3.0", "AFL-3.0"],
     "require": {
-        "php": ">=8.5"
+        "php": ">=8.5.1"
     },
     "conflict": {
         "mahocommerce/maho": "<26.9"
@@ -30,7 +30,7 @@
             "pestphp/pest-plugin": true
         },
         "platform": {
-            "php": "8.5"
+            "php": "8.5.1"
         }
     }
 }
