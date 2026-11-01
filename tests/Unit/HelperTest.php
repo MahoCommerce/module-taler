@@ -108,3 +108,50 @@ describe('buildApiBaseUrl', function (): void {
             ->toBe('https://backend.example.com/instances/my%20shop');
     });
 });
+
+describe('secretsMatch', function (): void {
+    test('accepts the expected secret', function (): void {
+        expect($this->helper->secretsMatch('s3cret', 's3cret'))->toBeTrue();
+    });
+
+    test('ignores whitespace around the given secret', function (): void {
+        expect($this->helper->secretsMatch('s3cret', " s3cret\r\n"))->toBeTrue();
+    });
+
+    test('rejects a different secret', function (): void {
+        expect($this->helper->secretsMatch('s3cret', 's3cre'))->toBeFalse();
+    });
+
+    test('rejects everything when no secret is configured', function (): void {
+        expect($this->helper->secretsMatch('', ''))->toBeFalse();
+    });
+});
+
+describe('getWebhookId', function (): void {
+    test('is stable for one URL and valid as a backend slug', function (): void {
+        $id = $this->helper->getWebhookId('https://shop.example.com/taler/webhook/');
+        expect($id)->toBe($this->helper->getWebhookId('https://shop.example.com/taler/webhook/'))
+            ->and($id)->toMatch('/^maho-[0-9a-f]{16}$/');
+    });
+
+    test('differs for two stores', function (): void {
+        expect($this->helper->getWebhookId('https://a.example.com/taler/webhook/'))
+            ->not->toBe($this->helper->getWebhookId('https://b.example.com/taler/webhook/'));
+    });
+});
+
+describe('getIncrementIdFromTalerOrderId', function (): void {
+    test('removes the random suffix', function (): void {
+        expect($this->helper->getIncrementIdFromTalerOrderId('100000123-a1b2c3d4'))->toBe('100000123');
+    });
+
+    test('keeps dashes inside the increment id', function (): void {
+        expect($this->helper->getIncrementIdFromTalerOrderId('EU-100000123-a1b2c3d4'))->toBe('EU-100000123');
+    });
+
+    test('returns empty for an id without a suffix', function (): void {
+        expect($this->helper->getIncrementIdFromTalerOrderId('100000123'))->toBe('')
+            ->and($this->helper->getIncrementIdFromTalerOrderId('-a1b2c3d4'))->toBe('')
+            ->and($this->helper->getIncrementIdFromTalerOrderId(''))->toBe('');
+    });
+});

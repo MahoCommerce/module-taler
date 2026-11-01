@@ -12,6 +12,14 @@ class Maho_Taler_Helper_Data extends Mage_Core_Helper_Abstract
 {
     public const LOG_FILE = 'taler.log';
 
+    public const PAYMENT_PAGE_STORE = 'store';
+    public const PAYMENT_PAGE_BACKEND = 'backend';
+
+    /**
+     * Header that carries the shared secret in webhook calls from the backend.
+     */
+    public const WEBHOOK_SECRET_HEADER = 'X-Maho-Taler-Secret';
+
     #[\Override]
     protected $_moduleName = 'Maho_Taler';
 
@@ -82,6 +90,88 @@ class Maho_Taler_Helper_Data extends Mage_Core_Helper_Abstract
     public function getRefundDelayDays(?int $storeId = null): int
     {
         return max(0, (int) Mage::getStoreConfig('maho_taler/connection/refund_delay_days', $storeId));
+    }
+
+    /**
+     * The currency the merchant backend accepts, for example "EUR" or
+     * "KUDOS". Empty when the admin has not set it and the save of the
+     * configuration could not read it from the backend.
+     */
+    public function getCurrency(?int $storeId = null): string
+    {
+        return strtoupper(trim((string) Mage::getStoreConfig('maho_taler/connection/currency', $storeId)));
+    }
+
+    /**
+     * True when the backend accepts the given currency. An empty accepted
+     * currency accepts all currencies: the backend then rejects a wrong one
+     * when the order is created.
+     */
+    public function isCurrencyAccepted(string $currency, ?int $storeId = null): bool
+    {
+        $accepted = $this->getCurrency($storeId);
+        return $accepted === '' || $accepted === strtoupper(trim($currency));
+    }
+
+    public function isWebhookEnabled(?int $storeId = null): bool
+    {
+        return Mage::getStoreConfigFlag('maho_taler/connection/webhook', $storeId);
+    }
+
+    /**
+     * Shared secret that the backend sends in the webhook header. The
+     * configuration save makes it (see Maho_Taler_Model_Observer). The
+     * encrypted backend model in config.xml decrypts it on read.
+     */
+    public function getWebhookSecret(?int $storeId = null): string
+    {
+        return trim((string) Mage::getStoreConfig('maho_taler/connection/webhook_secret', $storeId));
+    }
+
+    /**
+     * Constant-time check of the secret of an incoming webhook call.
+     */
+    public function isValidWebhookSecret(#[\SensitiveParameter] string $given, ?int $storeId = null): bool
+    {
+        return $this->secretsMatch($this->getWebhookSecret($storeId), $given);
+    }
+
+    /**
+     * An empty expected secret never matches: without a secret, all calls
+     * are rejected.
+     */
+    public function secretsMatch(#[\SensitiveParameter] string $expected, #[\SensitiveParameter] string $given): bool
+    {
+        return $expected !== '' && hash_equals($expected, trim($given));
+    }
+
+    /**
+     * Webhook ID in the backend for the given webhook URL. A hash of the URL
+     * gives each store its own webhook when several stores use one instance.
+     */
+    public function getWebhookId(string $webhookUrl): string
+    {
+        return 'maho-' . substr(sha1($webhookUrl), 0, 16);
+    }
+
+    /**
+     * The Maho increment ID in a Taler order ID. createTalerOrder() adds a
+     * random suffix after the last "-".
+     */
+    public function getIncrementIdFromTalerOrderId(string $talerOrderId): string
+    {
+        $position = strrpos($talerOrderId, '-');
+        return $position === false || $position === 0 ? '' : substr($talerOrderId, 0, $position);
+    }
+
+    /**
+     * Where the customer pays: the store page (QR code and polling in the
+     * store) or the payment page of the Taler backend.
+     */
+    public function getPaymentPage(?int $storeId = null): string
+    {
+        $page = (string) Mage::getStoreConfig('payment/taler/payment_page', $storeId);
+        return $page === self::PAYMENT_PAGE_BACKEND ? self::PAYMENT_PAGE_BACKEND : self::PAYMENT_PAGE_STORE;
     }
 
     public function isDebug(?int $storeId = null): bool

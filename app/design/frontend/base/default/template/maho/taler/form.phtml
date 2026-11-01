@@ -1,0 +1,24 @@
+<?php
+/**
+ * SPDX-FileCopyrightText: 2026 Maho <https://mahocommerce.com>
+ * SPDX-License-Identifier: AFL-3.0
+ * @package Maho_Taler
+ */
+
+/** @var Maho_Taler_Block_Form $this */
+?>
+<ul class="form-list taler-form-description" id="payment_form_<?= $this->escapeHtml($this->getMethodCode()) ?>" style="display:none;">
+    <li>
+        <?= $this->escapeHtml($this->__('Pay with digital cash from your GNU Taler wallet. Your payment stays private.')) ?>
+    </li>
+    <li>
+        <?php if ($this->isStorePaymentPage()): ?>
+            <?= $this->escapeHtml($this->__('After you place the order, scan the QR code with your phone wallet, or open your browser wallet.')) ?>
+        <?php else: ?>
+            <?= $this->escapeHtml($this->__('After you place the order, you go to the GNU Taler payment page to pay with your wallet.')) ?>
+        <?php endif ?>
+    </li>
+    <li>
+        <a href="https://wallet.taler.net/" target="_blank" rel="noopener noreferrer"><?= $this->escapeHtml($this->__('No wallet yet? Get the GNU Taler wallet.')) ?></a>
+    </li>
+</ul>

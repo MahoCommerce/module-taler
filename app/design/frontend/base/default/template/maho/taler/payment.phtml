@@ -1,0 +1,67 @@
+<?php
+/**
+ * SPDX-FileCopyrightText: 2026 Maho <https://mahocommerce.com>
+ * SPDX-License-Identifier: AFL-3.0
+ * @package Maho_Taler
+ */
+
+/** @var Maho_Taler_Block_Payment $this */
+$payUri = $this->getPayUri();
+$backendPageUrl = $this->getBackendPageUrl();
+?>
+<style>
+.taler-payment { max-width: 30rem; margin: 0 auto; display: flex; flex-direction: column; align-items: center; gap: .75rem; text-align: center; }
+.taler-payment .page-title { width: 100%; justify-content: center; }
+.taler-payment .page-title h1 { text-align: center; }
+.taler-payment p { margin: 0; }
+.taler-qr-code svg { display: block; width: 240px; max-width: 100%; height: auto; }
+</style>
+<div class="taler-payment">
+    <div class="page-title">
+        <h1><?= $this->escapeHtml($this->__('Pay with GNU Taler')) ?></h1>
+    </div>
+
+    <p><?= $this->escapeHtml($this->__('Order #%s: %s', $this->getIncrementId(), $this->getFormattedAmount())) ?></p>
+
+    <p><?= $this->escapeHtml($this->__('Scan this QR code with the GNU Taler wallet on your phone.')) ?></p>
+    <div class="taler-qr-code"><?= $this->getQrCodeSvg() ?></div>
+
+    <p><?= $this->escapeHtml($this->__('Or pay with the wallet on this device:')) ?></p>
+    <p>
+        <a class="button btn-checkout" id="taler-pay-link" href="<?= $this->escapeHtml($payUri) ?>"><span><span><?= $this->escapeHtml($this->__('Open in wallet')) ?></span></span></a>
+    </p>
+
+    <p id="taler-payment-status" role="status" aria-live="polite"><?= $this->escapeHtml($this->__('Waiting for your payment...')) ?></p>
+
+    <p>
+        <a href="https://wallet.taler.net/" target="_blank" rel="noopener noreferrer"><?= $this->escapeHtml($this->__('No wallet yet? Get the GNU Taler wallet.')) ?></a>
+    </p>
+    <?php if ($backendPageUrl !== ''): ?>
+        <p>
+            <a href="<?= $this->escapeUrl($backendPageUrl) ?>"><?= $this->escapeHtml($this->__('Problems? Open the payment page of the GNU Taler backend.')) ?></a>
+        </p>
+    <?php endif ?>
+
+    <form method="post" action="<?= $this->escapeUrl($this->getCancelUrl()) ?>">
+        <input type="hidden" name="form_key" value="<?= $this->escapeHtml($this->getFormKey()) ?>">
+        <button type="submit" class="button btn-cancel"><span><span><?= $this->escapeHtml($this->__('Cancel and return to cart')) ?></span></span></button>
+    </form>
+</div>
+<script>
+(() => {
+    const statusUrl = <?= json_encode($this->getStatusUrl(), JSON_HEX_TAG | JSON_HEX_AMP | JSON_UNESCAPED_SLASHES) ?>;
+    const poll = async () => {
+        try {
+            const result = await mahoFetch(statusUrl, { loaderArea: false });
+            if (result && result.done) {
+                window.location.href = result.redirect;
+                return;
+            }
+            setTimeout(poll, 1000);
+        } catch (error) {
+            setTimeout(poll, 5000);
+        }
+    };
+    poll();
+})();
+</script>

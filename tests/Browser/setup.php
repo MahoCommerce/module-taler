@@ -45,6 +45,10 @@ $save('maho_taler/connection/backend_url', getenv('TALER_BACKEND_URL') ?: 'https
 $save('maho_taler/connection/instance', $instance);
 $save('maho_taler/connection/api_token', Mage::helper('core')->encrypt(getenv('TALER_API_TOKEN') ?: 'sandbox'));
 $save('maho_taler/connection/debug', '1');
+$save('payment/taler/payment_page', 'store');
+// The demo backend cannot reach this local store, so the cron and the
+// payment page polling must finalize the orders without a webhook.
+$save('maho_taler/connection/webhook', '0');
 
 // The order is created in the store currency, so the store must sell in the
 // backend's currency (KUDOS on the demo backend).

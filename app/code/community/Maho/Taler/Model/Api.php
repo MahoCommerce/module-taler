@@ -10,8 +10,9 @@ declare(strict_types=1);
 
 /**
  * Minimal client for the GNU Taler merchant backend REST API
- * (https://docs.taler.net/core/api-merchant.html). Only the four endpoints
- * the payment flow needs — deliberately no SDK dependency.
+ * (https://docs.taler.net/core/api-merchant.html). Only the endpoints the
+ * payment flow and the webhook registration need. No official PHP SDK for
+ * Taler exists, so the module has this small client of its own.
  */
 class Maho_Taler_Model_Api
 {
@@ -131,16 +132,58 @@ class Maho_Taler_Model_Api
     }
 
     /**
-     * Delete an order from the backend. Only unpaid (or fully wire-settled)
-     * orders can be deleted; the backend refuses for orders awaiting
-     * settlement.
+     * Delete an order from the backend. The backend never deletes a paid
+     * order. Without $force it also refuses an order that a wallet claimed.
      *
      * @throws Maho_Taler_Model_Api_NotFoundException when the backend no longer knows the order
      * @throws Mage_Core_Exception
      */
-    public function deleteOrder(string $orderId): void
+    public function deleteOrder(string $orderId, bool $force = false): void
     {
-        $this->_request('DELETE', '/private/orders/' . rawurlencode($orderId));
+        $this->_request('DELETE', '/private/orders/' . rawurlencode($orderId), [], $force ? ['force' => 'YES'] : []);
+    }
+
+    /**
+     * Create a webhook, or update it when the ID already exists.
+     *
+     * @param array<string, string> $details event_type, url, http_method,
+     *                                       header_template and body_template
+     * @throws Mage_Core_Exception
+     */
+    public function upsertWebhook(string $webhookId, array $details): void
+    {
+        $endpoint = '/private/webhooks/' . rawurlencode($webhookId);
+        try {
+            $this->_request('PATCH', $endpoint, $details);
+        } catch (Maho_Taler_Model_Api_NotFoundException) {
+            $this->_request('POST', '/private/webhooks', ['webhook_id' => $webhookId] + $details);
+        }
+    }
+
+    /**
+     * Get one webhook.
+     *
+     * @return array<string, mixed> event_type, url, http_method, header_template, body_template
+     * @throws Maho_Taler_Model_Api_NotFoundException when the backend does not know the webhook
+     * @throws Mage_Core_Exception
+     */
+    public function getWebhook(string $webhookId): array
+    {
+        return $this->_request('GET', '/private/webhooks/' . rawurlencode($webhookId));
+    }
+
+    /**
+     * Delete a webhook. An unknown webhook is not an error.
+     *
+     * @throws Mage_Core_Exception
+     */
+    public function deleteWebhook(string $webhookId): void
+    {
+        try {
+            $this->_request('DELETE', '/private/webhooks/' . rawurlencode($webhookId));
+        } catch (Maho_Taler_Model_Api_NotFoundException) {
+            // Already gone.
+        }
     }
 
     /**
