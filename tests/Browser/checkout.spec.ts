@@ -311,7 +311,7 @@ test('an order that is paid before the page sees it opens the success page, also
         { timeout: 60_000 },
     ).toBe(true);
 
-    // The canonical URL, with the trailing slash that the store adds: other forms get a 301 first.
+    // The store adds a slash at the end of a page URL. A URL without it gets a 301 redirect first.
     const pay = await page.request.get('taler/payment/pay/', { maxRedirects: 0 });
     expect(pay.status()).toBe(302);
     expect(pay.headers()['location']).toMatch(/taler\/payment\/success/);
