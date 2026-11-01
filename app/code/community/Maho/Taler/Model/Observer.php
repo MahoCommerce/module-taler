@@ -95,7 +95,7 @@ class Maho_Taler_Model_Observer
 
         $config = $api->getConfig();
         $backendCurrency = strtoupper((string) ($config['currency'] ?? ''));
-        $supported = array_map('strtoupper', array_keys((array) ($config['currencies'] ?? [])));
+        $supported = array_map(strtoupper(...), array_keys((array) ($config['currencies'] ?? [])));
         if ($backendCurrency !== '') {
             $supported[] = $backendCurrency;
         }
