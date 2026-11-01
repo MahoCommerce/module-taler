@@ -63,7 +63,7 @@ class Maho_Taler_Block_Payment extends Mage_Core_Block_Template
     public function getFormattedAmount(): string
     {
         $order = $this->getOrder();
-        return $order === null ? '' : $order->formatPriceTxt((float) $order->getGrandTotal());
+        return $order?->formatPriceTxt((float) $order->getGrandTotal()) ?? '';
     }
 
     public function getIncrementId(): string
