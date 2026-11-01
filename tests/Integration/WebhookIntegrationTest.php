@@ -97,3 +97,63 @@ test('processPaymentStatus returns the fresh order and leaves a finished order a
         ->and($second->getState())->toBe(Mage_Sales_Model_Order::STATE_CANCELED)
         ->and($second->getStatusHistoryCollection()->count())->toBe($first->getStatusHistoryCollection()->count());
 });
+
+/**
+ * A cron whose backend answers every order status call with the given error.
+ */
+function talerCronWithBackendError(\Throwable $error): Maho_Taler_Model_Cron
+{
+    return new class ($error) extends Maho_Taler_Model_Cron {
+        public function __construct(private readonly \Throwable $error) {}
+
+        #[\Override]
+        protected function _getApi(int $storeId): Maho_Taler_Model_Api
+        {
+            return new class ($this->error) extends Maho_Taler_Model_Api {
+                public function __construct(private readonly \Throwable $error) {}
+
+                #[\Override]
+                public function getOrder(string $orderId, ?int $timeoutMs = null): array
+                {
+                    throw $this->error;
+                }
+            };
+        }
+    };
+}
+
+/**
+ * Mage::logException() reads the text of the exception, so the flag shows a log write.
+ */
+trait TalerLogProbe
+{
+    public bool $logged = false;
+
+    #[\Override]
+    public function __toString(): string
+    {
+        $this->logged = true;
+        return parent::__toString();
+    }
+}
+
+test('a cancelled order that the backend no longer knows writes nothing to the exception log', function (): void {
+    /** @var Mage_Sales_Model_Order_Payment $payment */
+    $payment = Mage::getModel('sales/order_payment');
+    $payment->setMethod('taler')->setAdditionalInformation('taler_order_id', talerTestOrderId());
+    /** @var Mage_Sales_Model_Order $order */
+    $order = Mage::getModel('sales/order');
+    $order->setState(Mage_Sales_Model_Order::STATE_CANCELED)->setPayment($payment);
+
+    $notFound = new class ('gone') extends Maho_Taler_Model_Api_NotFoundException {
+        use TalerLogProbe;
+    };
+    $otherError = new class ('backend down') extends RuntimeException {
+        use TalerLogProbe;
+    };
+    talerCronWithBackendError($notFound)->processPaymentStatus($order, false);
+    talerCronWithBackendError($otherError)->processPaymentStatus($order, false);
+
+    expect($notFound->logged)->toBeFalse()
+        ->and($otherError->logged)->toBeTrue();
+});
