@@ -253,7 +253,8 @@ class Maho_Taler_PaymentController extends Mage_Core_Controller_Front_Action
 
         $session = Mage::getSingleton('checkout/session');
         $session->setQuoteId($session->getTalerQuoteId(true));
-        $this->_restoreCart($order);
+        // The status check cancelled the order under the lock. When it failed, the cron job cancels it later.
+        $this->_restoreCart($order, false);
         $this->_redirect('checkout/cart');
     }
 
@@ -278,9 +279,11 @@ class Maho_Taler_PaymentController extends Mage_Core_Controller_Front_Action
         return $payment ? (string) $payment->getAdditionalInformation('taler_order_id') : '';
     }
 
-    protected function _restoreCart(Mage_Sales_Model_Order $order): void
+    protected function _restoreCart(Mage_Sales_Model_Order $order, bool $cancelOrder = true): void
     {
-        $order->cancel()->save();
+        if ($cancelOrder) {
+            $order->cancel()->save();
+        }
         $quote = Mage::getModel('sales/quote')->load($order->getQuoteId());
         if ($quote->getId()) {
             $quote->setIsActive(1)->setReservedOrderId('')->save();

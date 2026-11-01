@@ -277,6 +277,18 @@ test('the cancel button deletes the order in the backend and gives the cart back
     const cancelledIncrementId = (await page.getByText(/^Order #/).textContent())?.match(/#(\S+):/)?.[1];
     expect(cancelledIncrementId, 'the payment page shows the order number').toBeTruthy();
 
+    // The config write flushes the cache, which also resets the rate limit counters.
+    inspect('config', 'system/rate_limit/taler_payment_status=1');
+    try {
+        await page.request.get('/taler/payment/status', { timeout: 15_000 });
+        const start = Date.now();
+        const limited = await page.request.get('/taler/payment/status');
+        expect((await limited.json()).done).toBe(false);
+        expect(Date.now() - start, 'a limited poll does not wait for the backend').toBeLessThan(5_000);
+    } finally {
+        inspect('config', 'system/rate_limit/taler_payment_status=30');
+    }
+
     await page.getByRole('button', { name: 'Cancel and return to cart' }).click();
     await page.waitForURL(/checkout\/cart/);
     await expect(page.locator('#shopping-cart-table')).toContainText('Taler Browser Test Product');
@@ -284,4 +296,26 @@ test('the cancel button deletes the order in the backend and gives the cart back
     const order = inspect<OrderInfo>('order', cancelledIncrementId!);
     expect(order.state).toBe('canceled');
     expect(order.backend, 'the backend no longer knows the order').toBeNull();
+});
+
+test('an order that is paid before the page sees it opens the success page, also from the cancel button', async ({ page }) => {
+    fundWallet('KUDOS:5');
+    await checkoutAsGuest(page);
+    // Stop the page polling, so that the order is paid while the page still shows the QR code.
+    await page.route('**/taler/payment/status**', (route) => route.abort());
+    await page.getByRole('button', { name: 'Place Order' }).click();
+    await page.waitForURL(/\/taler\/payment\/pay/, { timeout: 60_000 });
+    wallet('handle-uri', '-y', (await page.getByRole('link', { name: 'Open in wallet' }).getAttribute('href'))!);
+    await expect.poll(
+        async () => (await (await page.request.get('/taler/payment/status')).json()).done,
+        { timeout: 60_000 },
+    ).toBe(true);
+
+    const pay = await page.request.get('/taler/payment/pay', { maxRedirects: 0 });
+    expect(pay.status()).toBe(302);
+    expect(pay.headers()['location']).toMatch(/taler\/payment\/success/);
+
+    await page.getByRole('button', { name: 'Cancel and return to cart' }).click();
+    await page.waitForURL(/checkout\/onepage\/success/);
+    await expectInvoicedOrder(page);
 });

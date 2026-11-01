@@ -202,6 +202,8 @@ class Maho_Taler_Model_Cron
                     $storeId,
                 );
             }
+        } catch (Maho_Taler_Model_Api_NotFoundException) {
+            // The cancel button deleted it in the backend, so no wallet can pay it.
         } catch (\Throwable $e) {
             Mage::logException($e);
         }
