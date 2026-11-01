@@ -102,10 +102,8 @@ class Maho_Taler_PaymentController extends Mage_Core_Controller_Front_Action
     public function statusAction(): void
     {
         $order = $this->_getSessionOrder();
-        $done = $order === null || $order->getState() !== Mage_Sales_Model_Order::STATE_PENDING_PAYMENT;
-        $limit = (int) Mage::getStoreConfig('system/rate_limit/taler_payment_status');
-        // Each poll holds a PHP worker, so parallel polls must not fill the pool.
-        if (!$done && Mage::helper('core')->rateLimiter('taler_payment_status', $limit, 60)->attempt()) {
+        $done = true;
+        if ($order !== null && $order->getState() === Mage_Sales_Model_Order::STATE_PENDING_PAYMENT) {
             // A long-poll must not keep the session locked: the customer can
             // use the store in another tab in the meantime.
             session_write_close();
