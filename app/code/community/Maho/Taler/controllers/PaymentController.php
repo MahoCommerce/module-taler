@@ -74,9 +74,13 @@ class Maho_Taler_PaymentController extends Mage_Core_Controller_Front_Action
     #[Maho\Config\Route('/taler/payment/pay', methods: ['GET'])]
     public function payAction(): void
     {
-        $order = $this->_getPendingSessionOrder();
-        if ($order === null) {
+        $order = $this->_getSessionOrder();
+        if ($order === null || $this->_getTalerOrderId($order) === '') {
             $this->_redirect('checkout/cart');
+            return;
+        }
+        if ($order->getState() !== Mage_Sales_Model_Order::STATE_PENDING_PAYMENT) {
+            $this->_redirect('taler/payment/success', ['_secure' => true]);
             return;
         }
 
@@ -98,8 +102,10 @@ class Maho_Taler_PaymentController extends Mage_Core_Controller_Front_Action
     public function statusAction(): void
     {
         $order = $this->_getSessionOrder();
-        $done = true;
-        if ($order !== null && $order->getState() === Mage_Sales_Model_Order::STATE_PENDING_PAYMENT) {
+        $done = $order === null || $order->getState() !== Mage_Sales_Model_Order::STATE_PENDING_PAYMENT;
+        $limit = (int) Mage::getStoreConfig('system/rate_limit/taler_payment_status');
+        // Each poll holds a PHP worker, so parallel polls must not fill the pool.
+        if (!$done && Mage::helper('core')->rateLimiter('taler_payment_status', $limit, 60)->attempt()) {
             // A long-poll must not keep the session locked: the customer can
             // use the store in another tab in the meantime.
             session_write_close();
@@ -204,33 +210,19 @@ class Maho_Taler_PaymentController extends Mage_Core_Controller_Front_Action
     }
 
     /**
-     * The "Back to cart" button of the store payment page. The backend page
-     * has no cancel callback of its own.
+     * The "Cancel and return to cart" button of the store payment page. The
+     * backend page has no cancel callback of its own.
      *
-     * A payment can arrive while the customer clicks, so check the backend
-     * first. The unpaid order is then deleted in the backend before the
-     * cancel, so the wallet cannot pay it later.
+     * The unpaid order is deleted in the backend first, so the wallet cannot
+     * pay it later. Then the status check cancels it under the order lock.
      */
     #[Maho\Config\Route('/taler/payment/cancel', methods: ['POST'])]
     public function cancelAction(): void
     {
-        if (!$this->_validateFormKey()) {
+        $order = $this->_validateFormKey() ? $this->_getSessionOrder() : null;
+        if ($order === null || $this->_getTalerOrderId($order) === '') {
             $this->_redirect('checkout/cart');
             return;
-        }
-
-        $order = $this->_getPendingSessionOrder();
-        if ($order === null) {
-            $this->_redirect('checkout/cart');
-            return;
-        }
-
-        try {
-            /** @var Maho_Taler_Model_Cron $cron */
-            $cron = Mage::getModel('maho_taler/cron');
-            $order = $cron->processPaymentStatus($order, false);
-        } catch (\Throwable $e) {
-            Mage::logException($e);
         }
         if ($order->getState() !== Mage_Sales_Model_Order::STATE_PENDING_PAYMENT) {
             $this->_redirect('taler/payment/success', ['_secure' => true]);
@@ -251,6 +243,14 @@ class Maho_Taler_PaymentController extends Mage_Core_Controller_Front_Action
             return;
         }
 
+        try {
+            /** @var Maho_Taler_Model_Cron $cron */
+            $cron = Mage::getModel('maho_taler/cron');
+            $order = $cron->processPaymentStatus($order, false);
+        } catch (\Throwable $e) {
+            Mage::logException($e);
+        }
+
         $session = Mage::getSingleton('checkout/session');
         $session->setQuoteId($session->getTalerQuoteId(true));
         $this->_restoreCart($order);
@@ -267,18 +267,6 @@ class Maho_Taler_PaymentController extends Mage_Core_Controller_Front_Action
         $order = Mage::getModel('sales/order')->loadByIncrementId($incrementId);
         $payment = $order->getId() ? $order->getPayment() : null;
         if (!$payment || $payment->getMethod() !== 'taler') {
-            return null;
-        }
-        return $order;
-    }
-
-    protected function _getPendingSessionOrder(): ?Mage_Sales_Model_Order
-    {
-        $order = $this->_getSessionOrder();
-        if ($order === null
-            || $order->getState() !== Mage_Sales_Model_Order::STATE_PENDING_PAYMENT
-            || $this->_getTalerOrderId($order) === ''
-        ) {
             return null;
         }
         return $order;

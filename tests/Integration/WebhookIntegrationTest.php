@@ -40,8 +40,14 @@ test('a body that is not JSON is rejected without a retry', function (): void {
 });
 
 test('an order of another store on the same instance is rejected without a retry', function (): void {
-    expect(talerWebhook(TALER_INTEGRATION_WEBHOOK_SECRET, talerWebhookBody('999999999-deadbeef')))
-        ->toBe(Maho_Taler_Model_Webhook::HTTP_REJECTED);
+    // The other store can use the same increment id, with another random suffix.
+    $order = talerPendingOrderPair();
+    try {
+        expect(talerWebhook(TALER_INTEGRATION_WEBHOOK_SECRET, talerWebhookBody($order->getIncrementId() . '-00000000')))
+            ->toBe(Maho_Taler_Model_Webhook::HTTP_REJECTED);
+    } finally {
+        talerDeleteQuietly(taler_integration_taler_order_id($order));
+    }
 });
 
 test('a wrong secret is rejected and leaves the order pending', function (): void {
@@ -90,12 +96,4 @@ test('processPaymentStatus returns the fresh order and leaves a finished order a
     expect($first->getState())->toBe(Mage_Sales_Model_Order::STATE_CANCELED)
         ->and($second->getState())->toBe(Mage_Sales_Model_Order::STATE_CANCELED)
         ->and($second->getStatusHistoryCollection()->count())->toBe($first->getStatusHistoryCollection()->count());
-});
-
-test('a forced delete removes an unpaid backend order', function (): void {
-    $talerOrderId = talerTestOrderId();
-    talerApi()->createOrder(talerOrderSpec($talerOrderId, 1.00));
-    talerApi()->deleteOrder($talerOrderId, true);
-
-    expect(fn() => talerApi()->getOrder($talerOrderId))->toThrow(Maho_Taler_Model_Api_NotFoundException::class);
 });

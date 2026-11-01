@@ -62,12 +62,16 @@ $backend = null;
 if ($talerOrderId !== '') {
     /** @var Maho_Taler_Model_Api $api */
     $api = Mage::getModel('maho_taler/api', ['store_id' => (int) $order->getStoreId()]);
-    $status = $api->getOrder($talerOrderId);
-    $backend = [
-        'order_status' => $status['order_status'] ?? null,
-        'refunded' => $status['refunded'] ?? null,
-        'refund_amount' => $status['refund_amount'] ?? null,
-    ];
+    try {
+        $status = $api->getOrder($talerOrderId);
+        $backend = [
+            'order_status' => $status['order_status'] ?? null,
+            'refunded' => $status['refunded'] ?? null,
+            'refund_amount' => $status['refund_amount'] ?? null,
+        ];
+    } catch (Maho_Taler_Model_Api_NotFoundException) {
+        // The cancel button deletes the order in the backend.
+    }
 }
 
 echo json_encode([

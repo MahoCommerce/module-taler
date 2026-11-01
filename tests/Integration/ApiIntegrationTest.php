@@ -164,3 +164,31 @@ test('a webhook is created, updated in place, and deleted', function (): void {
     // Deleting an unknown webhook is not an error.
     talerApi()->deleteWebhook($webhookId);
 });
+
+test('the configuration save registers the webhook for the store URL, and deletes it when off', function (): void {
+    /** @var Maho_Taler_Helper_Data $helper */
+    $helper = Mage::helper('maho_taler');
+    $storeId = (int) Mage::app()->getDefaultStoreView()?->getId();
+    $url = Mage::getUrl('taler/webhook', ['_store' => $storeId, '_secure' => true]);
+    $webhookId = $helper->getWebhookId($url);
+    $scope = ['scope' => 'default', 'scope_id' => 0, 'config_store_id' => 0, 'url_store_id' => $storeId];
+    $syncWebhook = new ReflectionMethod(Maho_Taler_Model_Observer::class, '_syncWebhook');
+    $observer = new Maho_Taler_Model_Observer();
+    // The observer writes its messages to the admin session, which a CLI run does not have.
+    Mage::register('_singleton/adminhtml/session', new class {
+        public function addSuccess(string $message): void {}
+    });
+
+    try {
+        $syncWebhook->invoke($observer, talerApi(), $scope, true, TALER_INTEGRATION_WEBHOOK_SECRET);
+        $webhook = talerApi()->getWebhook($webhookId);
+        expect($webhook['url'])->toBe($url)
+            ->and($webhook['header_template'])->toContain('X-Maho-Taler-Secret: ' . TALER_INTEGRATION_WEBHOOK_SECRET);
+
+        $syncWebhook->invoke($observer, talerApi(), $scope, false, TALER_INTEGRATION_WEBHOOK_SECRET);
+        expect(fn() => talerApi()->getWebhook($webhookId))->toThrow(Maho_Taler_Model_Api_NotFoundException::class);
+    } finally {
+        Mage::unregister('_singleton/adminhtml/session');
+        talerApi()->deleteWebhook($webhookId);
+    }
+});

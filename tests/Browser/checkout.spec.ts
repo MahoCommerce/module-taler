@@ -269,3 +269,19 @@ test('with the backend payment page setting, the guest pays on the page of the T
         inspect('config', 'payment/taler/payment_page=store');
     }
 });
+
+test('the cancel button deletes the order in the backend and gives the cart back', async ({ page }) => {
+    await checkoutAsGuest(page);
+    await page.getByRole('button', { name: 'Place Order' }).click();
+    await page.waitForURL(/\/taler\/payment\/pay/, { timeout: 60_000 });
+    const cancelledIncrementId = (await page.getByText(/^Order #/).textContent())?.match(/#(\S+):/)?.[1];
+    expect(cancelledIncrementId, 'the payment page shows the order number').toBeTruthy();
+
+    await page.getByRole('button', { name: 'Cancel and return to cart' }).click();
+    await page.waitForURL(/checkout\/cart/);
+    await expect(page.locator('#shopping-cart-table')).toContainText('Taler Browser Test Product');
+
+    const order = inspect<OrderInfo>('order', cancelledIncrementId!);
+    expect(order.state).toBe('canceled');
+    expect(order.backend, 'the backend no longer knows the order').toBeNull();
+});

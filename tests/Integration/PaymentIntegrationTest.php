@@ -166,3 +166,14 @@ test('a paid order is captured once, however many webhook calls and checks arriv
         ->and($fresh->getInvoiceCollection()->count())->toBe(1)
         ->and((float) $fresh->getBaseTotalPaid())->toBe(1.50);
 });
+
+test('a forced delete removes an order that a wallet claimed but did not pay', function (): void {
+    $talerOrderId = talerTestOrderId();
+    talerApi()->createOrder(talerOrderSpec($talerOrderId, 1.00));
+    // The customer scanned the QR code but did not pay: the wallet claims the order.
+    talerWallet('advanced', 'pay-prepare', (string) talerApi()->getOrder($talerOrderId)['taler_pay_uri']);
+
+    expect(fn() => talerApi()->deleteOrder($talerOrderId))->toThrow(Mage_Core_Exception::class);
+    talerApi()->deleteOrder($talerOrderId, true);
+    expect(fn() => talerApi()->getOrder($talerOrderId))->toThrow(Maho_Taler_Model_Api_NotFoundException::class);
+});
