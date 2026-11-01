@@ -234,10 +234,10 @@ class Maho_Taler_PaymentController extends Mage_Core_Controller_Front_Action
         } catch (Maho_Taler_Model_Api_NotFoundException) {
             // Already gone in the backend.
         } catch (\Throwable $e) {
-            // The backend never deletes a paid order: the wallet paid while
-            // the customer clicked. Finalize it instead.
+            // The wallet paid while the customer clicked, or the backend failed.
+            // The payment page checks the status again, and the customer can retry.
             Mage::logException($e);
-            $this->_redirect('taler/payment/success', ['_secure' => true]);
+            $this->_redirect('taler/payment/pay', ['_secure' => true]);
             return;
         }
 
