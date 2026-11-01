@@ -277,6 +277,18 @@ test('the cancel button deletes the order in the backend and gives the cart back
     const cancelledIncrementId = (await page.getByText(/^Order #/).textContent())?.match(/#(\S+):/)?.[1];
     expect(cancelledIncrementId, 'the payment page shows the order number').toBeTruthy();
 
+    // The config write flushes the cache, which also resets the rate limit counters.
+    inspect('config', 'system/rate_limit/taler_payment_status=1');
+    try {
+        await page.request.get('/taler/payment/status', { timeout: 15_000 });
+        const start = Date.now();
+        const limited = await page.request.get('/taler/payment/status');
+        expect((await limited.json()).done).toBe(false);
+        expect(Date.now() - start, 'a limited poll does not wait for the backend').toBeLessThan(5_000);
+    } finally {
+        inspect('config', 'system/rate_limit/taler_payment_status=30');
+    }
+
     await page.getByRole('button', { name: 'Cancel and return to cart' }).click();
     await page.waitForURL(/checkout\/cart/);
     await expect(page.locator('#shopping-cart-table')).toContainText('Taler Browser Test Product');

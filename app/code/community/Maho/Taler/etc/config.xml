@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 <!--
 SPDX-FileCopyrightText: 2026 Maho <https://mahocommerce.com>
-SPDX-License-Identifier: AFL-3.0
+SPDX-License-Identifier: OSL-3.0
 -->
 <config>
     <modules>
@@ -86,5 +86,10 @@ SPDX-License-Identifier: AFL-3.0
                 <order_status_processing>processing</order_status_processing>
             </taler>
         </payment>
+        <system>
+            <rate_limit>
+                <taler_payment_status>30</taler_payment_status>
+            </rate_limit>
+        </system>
     </default>
 </config>
