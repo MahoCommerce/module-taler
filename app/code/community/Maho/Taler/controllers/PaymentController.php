@@ -204,7 +204,7 @@ class Maho_Taler_PaymentController extends Mage_Core_Controller_Front_Action
         }
 
         if ($sessionOwnsOrder) {
-            $session->getQuote()->setIsActive(0)->save();
+            $session->getQuote()->setIsActive(false)->save();
         }
         $this->_redirect('checkout/onepage/success', ['_secure' => true]);
     }
@@ -286,7 +286,7 @@ class Maho_Taler_PaymentController extends Mage_Core_Controller_Front_Action
         }
         $quote = Mage::getModel('sales/quote')->load($order->getQuoteId());
         if ($quote->getId()) {
-            $quote->setIsActive(1)->setReservedOrderId('')->save();
+            $quote->setIsActive(true)->setReservedOrderId('')->save();
             Mage::getSingleton('checkout/session')->replaceQuote($quote);
         }
     }

@@ -65,6 +65,7 @@ class Maho_Taler_Model_Method_Standard extends Mage_Payment_Model_Method_Abstrac
     /**
      * Redirect URL returned to checkout JS after order placement.
      */
+    #[\Override]
     public function getOrderPlaceRedirectUrl(): string
     {
         return Mage::getUrl('taler/payment/redirect', ['_secure' => true]);
