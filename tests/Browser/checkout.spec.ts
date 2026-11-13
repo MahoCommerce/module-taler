@@ -187,6 +187,9 @@ test('online credit memos from the admin refund the order in the Taler backend, 
     await page.locator('#login').press('Enter');
     await expect(page.getByRole('heading', { name: 'Dashboard' })).toBeVisible();
 
+    // The dashboard loads its widgets with Ajax. The loading mask blocks the menu until they load.
+    await expect(page.locator('#loading-mask')).toBeHidden({ timeout: 30_000 });
+
     // Admin URLs carry a secret key, so reach the order through the menu and grid.
     const salesMenu = page.locator('li:has(> #nav-admin-sales)');
     await salesMenu.hover();
