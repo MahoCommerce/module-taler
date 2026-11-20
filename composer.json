@@ -27,7 +27,8 @@
     "config": {
         "allow-plugins": {
             "mahocommerce/maho-composer-plugin": true,
-            "pestphp/pest-plugin": true
+            "pestphp/pest-plugin": true,
+            "php-http/discovery": false
         },
         "platform": {
             "php": "8.5.1"
