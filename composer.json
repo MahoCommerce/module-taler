@@ -17,7 +17,8 @@
         "phpstan/phpstan-deprecation-rules": "*",
         "phpstan/phpstan-strict-rules": "*",
         "rector/rector": "*",
-        "pestphp/pest": "^4"
+        "pestphp/pest": "^5",
+        "pestphp/pest-plugin-browser": "^5"
     },
     "extra": {
         "maho": {
